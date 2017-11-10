@@ -11,5 +11,4 @@ See:
 This version:
 - Replies to mentions to *@TweetGamesBot*
 - Replies to replies to mentions of *@TweetGamesBot*
-- Rolls a 6-faced die with the command **/d6**
-  *Example:* Hey @TweetGamesBot ! Roll the /d6 for me!
+- Rolls a 6-faced die with the command **/d6** | *Example:* Hey @TweetGamesBot ! Roll the /d6 for me!

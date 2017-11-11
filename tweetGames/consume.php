@@ -134,12 +134,6 @@ class QueueConsumer
                              'in_reply_to_status_id' => $tweetID
                            );
           }
-          else
-          {
-            $arrPost = array('status' => '@' . $tweetFrom . ' Thanks for replying to my tweet!' . "\n\n" . 'Time: ' . date('h:i:s A'),
-                             'in_reply_to_status_id' => $tweetID
-                           );
-          }
         }
         else // Found a '/' command
         {

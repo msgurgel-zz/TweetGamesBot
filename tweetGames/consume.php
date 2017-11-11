@@ -151,7 +151,7 @@ class QueueConsumer
           //$this->myLog('Var Export: ' . $v);
 
           // Position 0 holds /command, other position holds possible arguments
-          if (!strncmp($commandArray[0], '/d'))
+          if (!strncmp($commandArray[0], '/d', 2))
           {
             $dieNum = substr($commandArray[0], 2);
             // Dice available: D4, D6, D8, D10, D12, D20, and D100

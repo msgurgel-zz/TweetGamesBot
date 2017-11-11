@@ -155,19 +155,25 @@ class QueueConsumer
           {
             $dieNum = substr($commandArray[0], 2);
             // Dice available: D4, D6, D8, D10, D12, D20, and D100
-            switch ($dieNum)
+            switch ($commandArray[0])
             {
-              case 4:
-              case 6:
-              case 8:
-              case 10:
-              case 12:
-              case 20:
-              case 100:
+              case "/d4":
+              case "/d6":
+              case "/d8":
+              case "/d10":
+              case "/d12":
+              case "/d20":
+              case "/d100":
               $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D' . $dieNum . ' Result: ' . rand(1, $dieNum) . "\n\n" . 'Time: ' . date('h:i:s A'),
                                'in_reply_to_status_id' => $tweetID
                              );
                 break;
+
+              case "/d4c":
+              $arrPost = array('status' => '@' . $tweetFrom . ' Did you mean: Filthy Acts At A Reasonable Price?' . "\n\n" . 'Time: ' . date('h:i:s A'),
+                               'in_reply_to_status_id' => $tweetID
+                             );
+                  break;
 
               default:
               $arrPost = array('status' => '@' . $tweetFrom . ' ERROR 404: Die not found: ' . $commandArray[0] . "\n\n" .  'Time: ' . date('h:i:s A'),

@@ -147,25 +147,34 @@ class QueueConsumer
 
           $this->myLog('Found command in: ' .  $commands);
 
-          $v = var_export($commandArray, true);
-          $this->myLog('Var Export: ' . $v);
+          //$v = var_export($commandArray, true);
+          //$this->myLog('Var Export: ' . $v);
 
           // Position 0 holds /command, other position holds possible arguments
-          switch ($commandArray[0])
+          if (!strncmp($commandArray[0], '/d'))
           {
-            // 6-faced Die
-            case '/d6':
-            $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D6 Result: ' . rand(1,6) . "\n\n" . 'Time: ' . date('h:i:s A'),
-                             'in_reply_to_status_id' => $tweetID
-                           );
-              break;
+            $dieNum = substr($commandArray[0], 2);
+            // Dice available: D4, D6, D8, D10, D12, D20, and D100
+            switch ($dieNum)
+            {
+              case 4:
+              case 6:
+              case 8:
+              case 10:
+              case 12:
+              case 20:
+              case 100:
+              $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D6 Result: ' . rand(1,$dieNum) . "\n\n" . 'Time: ' . date('h:i:s A'),
+                               'in_reply_to_status_id' => $tweetID
+                             );
+                break;
 
-            // Unknown command
-            default:
-            $arrPost = array('status' => '@' . $tweetFrom . ' Unknown command: ' . $commandArray[0] . "\n\n" .  'Time: ' . date('h:i:s A'),
-                             'in_reply_to_status_id' => $tweetID
-                           );
-              break;
+              default:
+              $arrPost = array('status' => '@' . $tweetFrom . ' ERROR 404: Die not found: ' . $commandArray[0] . "\n\n" .  'Time: ' . date('h:i:s A'),
+                               'in_reply_to_status_id' => $tweetID
+                             );
+                break;
+            }
           }
         }
 

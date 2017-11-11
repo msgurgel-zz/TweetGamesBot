@@ -164,7 +164,7 @@ class QueueConsumer
               case 12:
               case 20:
               case 100:
-              $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D6 Result: ' . rand(1,$dieNum) . "\n\n" . 'Time: ' . date('h:i:s A'),
+              $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D' . $dieNum . ' Result: ' . rand(1, $dieNum) . "\n\n" . 'Time: ' . date('h:i:s A'),
                                'in_reply_to_status_id' => $tweetID
                              );
                 break;

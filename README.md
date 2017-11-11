@@ -7,7 +7,11 @@ See:
 - https://github.com/fennb/phirehose
 - https://github.com/J7mbo/twitter-api-php
 
-## Version 0.1 - CURRENT
+## Version 0.2 - CURRENT
+- Replies to mentions to *@TweetGamesBot*
+- Rolls a multitude of dices(D4, D6, D8, D10, D20, D100) through the **/d** commands
+
+## Version 0.1
 This version:
 - Replies to mentions to *@TweetGamesBot*
 - Replies to replies to mentions of *@TweetGamesBot*

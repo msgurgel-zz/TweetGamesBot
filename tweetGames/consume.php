@@ -90,6 +90,8 @@ class QueueConsumer
    */
   protected function processQueueFile($queueFile)
   {
+    $post = true;
+    
     $this->myLog('Processing file: ' . $queueFile);
 
     // Open file
@@ -133,6 +135,10 @@ class QueueConsumer
             $arrPost = array('status' => '@' . $tweetFrom . ' Thanks for mentioning me! ' ."\u{1F60D}" . "\n\n" . 'Time: ' . date('h:i:s A'),
                              'in_reply_to_status_id' => $tweetID
                            );
+          }
+          else
+          {
+            $post = false;
           }
         }
         else // Found a '/' command
@@ -178,10 +184,12 @@ class QueueConsumer
           }
         }
 
-        // Post response tweet
-        $this->postTweet($arrPost);
-        $this->myLog('Tweet: ' . $arrPost['status']);
-
+        if ($post)
+        {
+          // Post response tweet
+          $this->postTweet($arrPost);
+          $this->myLog('Tweet: ' . $arrPost['status']);
+        }
       }
     } // End while
 

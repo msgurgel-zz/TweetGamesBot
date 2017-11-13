@@ -9,3 +9,14 @@
 
 CREATE DATABASE IF NOT EXISTS tweetgames;
 USE tweetgames;
+
+DROP TABLE IF EXISTS userbase;
+CREATE TABLE userbase 
+(
+  UserID 		INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY 	(UserID),
+  Username 		MEDIUMTEXT NOT NULL,
+  Counter 		INT DEFAULT NULL,
+  Expiration 	DATETIME DEFAULT '0000-00-00 00:00:00'
+);
+

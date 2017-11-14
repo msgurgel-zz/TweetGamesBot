@@ -16,6 +16,107 @@
 
 require_once('../lib/TwitterAPIExchange.php');
 
+/**
+ *
+ */
+class Requester
+{
+
+  /**
+  * Member Attributes
+  */
+
+  // MySQL DB - Constants
+  const SERVER_NAME  = "YOUR IP";
+  const USERNAME     = "YOUR USERNAME";
+  const PASSWORD     = "YOUR PASSWORD";
+  const DB_NAME      = "YOUR DATABASE";
+
+  // MySQL DB - Variables
+  private $conn;
+
+  // Twitter API - Constants
+  const SETTINGS = array(
+  'oauth_access_token' => "YOUR TOKEN",
+  'oauth_access_token_secret' => "YOUR SECRET",
+  'consumer_key' => "YOUR KEY",
+  'consumer_secret' => "YOUR SECRET"
+  );
+
+  // Twitter API - Variables
+  private $urlTwitterRequest;
+  private $requestMethod;
+
+  // GIPHY API - Constants
+  const GIPHY_KEY  = 'YOUR KEY';
+
+  /**
+  * Construct Requester Object
+  */
+  function __construct()
+  {
+    // Initialize variables
+    $this->urlTwitterRequest = "https://api.twitter.com/1.1/statuses/update.json";
+    $this->requestMethod = "POST";
+
+    // Connect to DB
+    $this->conn = new mysqli(self::SERVER_NAME, self::USERNAME, self::PASSWORD, self::DB_NAME);
+    if ($this->conn->connect_error)
+    {
+        log2file("MySQL: Failed to connect to the server. ERROR: " . $this->conn->connect_error);
+        die("Connection to DB failed: " . $this->conn->connect_error);
+    }
+  }
+
+
+
+    public function formatTweet($message, $user = NULL, $tweetReplyID = NULL)
+    {
+      if ($user == NULL && $tweetReplyID = NULL)
+      {
+        // Not replying to a tweet
+        $retval = array('status' => "$message \n\n Time: " . date('h:i:s A'));
+      }
+      else
+      {
+        $retval = array('status' => "@$user $message \n\n Time: " . date('h:i:s A'),
+                         'in_reply_to_status_id' => $tweetReplyID
+                       );
+      }
+
+      return $retval;
+    }
+
+    /**
+    * Post tweet through the twitter-api-php library
+    *
+    * @see TwitterAPIExchange.php
+    * @param $postfields parameters for the Twitter API request
+    */
+    public function postTweet($postfields)
+    {
+      $twitter = new TwitterAPIExchange(self::SETTINGS);
+
+      $twitter->buildOauth($this->urlTwitterRequest, $this->requestMethod)
+      ->setPostfields($postfields)
+      ->performRequest();
+    }
+
+
+    public function sqlQuery($query)
+    {
+      $serverReply = $this->conn->query($query);
+
+      return $serverReply;
+    }
+
+    public function closeSQL()
+    {
+      $this->conn->close();
+    }
+}
+
+
 class QueueConsumer
 {
 
@@ -23,53 +124,22 @@ class QueueConsumer
   protected $queueDir;
   protected $filePattern;
   protected $checkInterval;
-
-  // MySQL DB variables
-  private $servername;
-  private $username;
-  private $password;
-  private $dbname;
-  private $conn;
-
-
-  // Authorization Keys from apps.twitter.com
-  private $settings = array(
-  'oauth_access_token' => "YOUR TOKEN",
-  'oauth_access_token_secret' => "YOUR SECRET",
-  'consumer_key' => "YOUR KEY",
-  'consumer_secret' => "YOUR SECRET"
-  );
-
-   // URL for posting tweets - check https://developer.twitter.com/en/docs for more
-   private $url = "https://api.twitter.com/1.1/statuses/update.json";
-   private $requestMethod = "POST";
+  protected $requester;
 
   /**
    * Construct the consumer and start processing
    */
-  public function __construct($queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 5)
+  public function __construct($requester, $queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 5)
   {
     $this->queueDir = $queueDir;
     $this->filePattern = $filePattern;
     $this->checkInterval = $checkInterval;
+    $this->requester = $requester;
 
-    // MySQL DB variables
-    $this->servername = "YOUR SERVER IP";
-    $this->username = "YOUR USERNAME";
-    $this->password = "YOUR PASSWORD";
-    $this->dbname = "YOUR DATABASE NAME";
-
-    // Create connection
-    $this->conn = new mysqli($this->servername, $this->username, $this->password, $this->dbname);
-    // Check connection
-    if ($this->conn->connect_error)
-    {
-        die("Connection to DB failed: " . $this->conn->connect_error);
-    }
-    
     // Sanity checks
     if (!is_dir($queueDir))
     {
+      log2file('QueueConsumer: Invalid directory for queue files: ' . $queueDir);
       throw new ErrorException('Invalid directory: ' . $queueDir);
     }
   }
@@ -88,7 +158,7 @@ class QueueConsumer
       $queueFiles = glob($this->queueDir . '/' . $this->filePattern);
       $lastCheck = time();
 
-      $this->myLog('Found ' . count($queueFiles) . ' queue files to process...');
+      log2file('Found ' . count($queueFiles) . ' queue files to process...');
 
       // Iterate over each file (if any)
       foreach ($queueFiles as $queueFile)
@@ -97,7 +167,7 @@ class QueueConsumer
       }
 
       // Wait until ready for next check
-      $this->myLog('Sleeping...');
+      log2file('Sleeping...');
       while (time() - $lastCheck < $this->checkInterval)
       {
         sleep(1);
@@ -111,9 +181,10 @@ class QueueConsumer
    */
   protected function processQueueFile($queueFile)
   {
-    $post = true;
+    // Initialize Variables
+    $postReply = true;  // By default, always post a reply tweet
 
-    $this->myLog('Processing file: ' . $queueFile);
+    log2file('Processing file: ' . $queueFile);
 
     // Open file
     $fp = fopen($queueFile, 'r');
@@ -121,10 +192,9 @@ class QueueConsumer
     // Check if something has gone wrong, or perhaps the file is just locked by another process
     if (!is_resource($fp))
     {
-      $this->myLog('WARN: Unable to open file or file already open: ' . $queueFile . ' - Skipping.');
+      log2file('WARN: Unable to open file or file already open: ' . $queueFile . ' - Skipping.');
       return FALSE;
     }
-
     // Lock file
     flock($fp, LOCK_EX);
 
@@ -132,20 +202,22 @@ class QueueConsumer
     $statusCounter = 0;
     while ($rawStatus = fgets($fp, 8192))
     {
-      $statusCounter ++;
+      $statusCounter++;
+
       $stop = false;
 
       $data = json_decode($rawStatus, true);
 
       if (is_array($data) && isset($data['user']['screen_name']) && $data['entities']['user_mentions'][0]['screen_name'] == 'TweetGamesBot')
       {
+        // Grab data from tweet
         $tweetFrom = $data['user']['screen_name'];    // Username of the user that mentioned the bot
         $tweetID   = $data['id'];                     // ID of that tweet
         $tweetText = urldecode($data['text']);        // The tweet itself
         $isReply   = $data['in_reply_to_status_id'];  // ID of the tweet it is replying to
 
-        $this->myLog('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
-        //$this->myLog(var_export($data, true));
+        log2file('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
+        log2file(var_export($data, true));
 
         // Look for commands in tweet
         $commands = strchr($tweetText, '/');
@@ -154,9 +226,7 @@ class QueueConsumer
           // Check if tweet is a reply or just a new mention
           if ($isReply == NULL)
           {
-            $arrPost = array('status' => '@' . $tweetFrom . ' Thanks for mentioning me! ' ."\u{1F60D}" . "\n\n" . 'Time: ' . date('h:i:s A'),
-                             'in_reply_to_status_id' => $tweetID
-                           );
+            $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID);
           }
           else
           {
@@ -165,14 +235,14 @@ class QueueConsumer
         }
         else // Found a '/' command
         {
+          // Grab commands and possible arguments from string
           $commandArray = explode(" ", $commands);
 
-          $this->myLog('Found command in: ' .  $commands);
+          log2file('Found command in: ' .  $commands);
 
           //$v = var_export($commandArray, true);
           //$this->myLog('Var Export: ' . $v);
 
-          // Position 0 holds /command, other position holds possible arguments
           // DICE COMMANDS
           if (!strncmp($commandArray[0], '/d', 2))
           {
@@ -187,21 +257,15 @@ class QueueConsumer
               case "/d12":
               case "/d20":
               case "/d100":
-              $arrPost = array('status' => '@' . $tweetFrom . ' Roll the die! D' . $dieNum . ' Result: ' . rand(1, $dieNum) . "\n\n" . 'Time: ' . date('h:i:s A'),
-                               'in_reply_to_status_id' => $tweetID
-                             );
+              $arrPost = $this->requester->formatTweet("Roll the die! D$dieNum result = " . rand(1, $dieNum), $tweetFrom, $tweetID);
                 break;
 
               case "/d4c":
-              $arrPost = array('status' => '@' . $tweetFrom . ' Did you mean: Filthy Acts At A Reasonable Price?' . "\n\n" . 'Time: ' . date('h:i:s A'),
-                               'in_reply_to_status_id' => $tweetID
-                             );
-                  break;
+              $arrPost = $this->requester->formatTweet("Did you mean: Filthy Acts at a Reasonable Price?", $tweetFrom, $tweetID);
+                break;
 
               default:
-              $arrPost = array('status' => '@' . $tweetFrom . ' ERROR 404: Die not found: ' . $commandArray[0] . "\n\n" .  'Time: ' . date('h:i:s A'),
-                               'in_reply_to_status_id' => $tweetID
-                             );
+              $arrPost = $requester->formatTweet("ERROR 404: Die not found: " . $commandArray[0], $tweetFrom, $tweetID);
                 break;
             }
           }
@@ -214,7 +278,7 @@ class QueueConsumer
 
             // Get counter info from DB
             $sql = "SELECT UserID, Counter FROM userbase WHERE Username = '$tweetFrom'";
-            $serverReply = $this->conn->query($sql);
+            $serverReply = $this->requester->sqlQuery($sql);
 
             // Check if user is in the database
             if ($serverReply->num_rows == 1)
@@ -226,83 +290,83 @@ class QueueConsumer
                {
                  case "inc": // Increment counter
                  $sql = "UPDATE userbase SET Counter = Counter + 1 WHERE UserID = " .  $userInfo["UserID"];
-                 $serverReply = $this->conn->query($sql);
+                 $serverReply = $this->requester->sqlQuery($sql);
 
                  if ($serverReply === true)
                  {
-                   $this->myLog("MySQL: Counter from $tweetFrom was incremented. Current Value = " . ($userInfo["Counter"] + 1) );
+                   log2file("MySQL: Counter from $tweetFrom was incremented. Current Value = " . ($userInfo["Counter"] + 1) );
 
                    // Reply to original tweet, displaying COUNTER
-                   $arrPost = $this->formatTweet("Incrementing counter! New value = " . ($userInfo["Counter"] + 1), $tweetFrom, $tweetID);
+                   $arrPost = $this->requester->formatTweet("Incrementing counter! New value = " . ($userInfo["Counter"] + 1), $tweetFrom, $tweetID);
                  }
                  else
                  {
-                   $this->myLog("MySQL: Could not increment counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                   $arrPost = $this->formatTweet("Failed to increment counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                   log2file("MySQL: Could not increment counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                   $arrPost = $this->requester->formatTweet("Failed to increment counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
                  }
                  break;
 
                  case "dec": // Decrement counter
 
                  $sql = "UPDATE userbase SET Counter = Counter - 1 WHERE UserID = " . $userInfo["UserID"];
-                 $serverReply = $this->conn->query($sql);
+                 $serverReply = $this->requester->sqlQuery($sql);
 
                  if ($serverReply === true)
                  {
-                   $this->myLog("MySQL: Counter from $tweetFrom was decremented. Current Value = " . ($userInfo["Counter"] - 1) );
+                   log2file("MySQL: Counter from $tweetFrom was decremented. Current Value = " . ($userInfo["Counter"] - 1) );
 
                    // Reply to original tweet, displaying COUNTER
-                   $arrPost = $this->formatTweet("Decrementing counter! New value = " . ($userInfo["Counter"] - 1), $tweetFrom, $tweetID);
+                   $arrPost = $this->requester->formatTweet("Decrementing counter! New value = " . ($userInfo["Counter"] - 1), $tweetFrom, $tweetID);
                  }
                  else
                  {
-                   $this->myLog("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                   $arrPost = $this->formatTweet("Failed to decrement counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                   log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                   $arrPost = $this->requester->formatTweet("Failed to decrement counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
                  }
                  break;
 
                   case "reset": // reset counter
 
                   $sql = "UPDATE userbase SET Counter = 0 WHERE UserID = " . $userInfo["UserID"];
-                  $serverReply = $this->conn->query($sql);
+                  $serverReply = $this->requester->sqlQuery($sql);
                   if ($serverReply === true)
                   {
-                    $this->myLog("MySQL: Counter from $tweetFrom was set to 0");
+                    log2file("MySQL: Counter from $tweetFrom was set to 0");
 
                     // Reply to original tweet, displaying COUNTER
-                    $arrPost = $this->formatTweet("Resetting counter! New value = 0", $tweetFrom, $tweetID);
+                    $arrPost = $this->requester->formatTweet("Resetting counter! New value = 0", $tweetFrom, $tweetID);
                   }
                   else
                   {
-                    $this->myLog("MySQL: Could not reset counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                    $arrPost = $this->formatTweet("Failed to reset counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                    log2file("MySQL: Could not reset counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                    $arrPost = $this->requester->formatTweet("Failed to reset counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
                   }
                   break;
 
                   case "show": // Display counter
-                  $arrPost = $this->formatTweet("Here you go! Counter = " . $userInfo["Counter"], $tweetFrom, $tweetID);
+                  $arrPost = $this->requester->formatTweet("Here you go! Counter = " . $userInfo["Counter"], $tweetFrom, $tweetID);
                   break;
 
                   case "delete": // Delete counter - As of now, that removes the user from the DB
                   $sql = "DELETE FROM userbase WHERE UserID = " . $userInfo["UserID"];
-                  $serverReply = $this->conn->query($sql);
+                  $serverReply = $this->requester->sqlQuery($sql);
                   if ($serverReply === true)
                   {
-                    $this->myLog("MySQL: Deleted $tweetFrom from DB");
+                    log2file("MySQL: Deleted $tweetFrom from DB");
 
                     // Reply to original tweet, displaying COUNTER
-                    $arrPost = $this->formatTweet("Your counter has been deleted! Thank you for using this bot!", $tweetFrom, $tweetID);
+                    $arrPost = $this->requester->formatTweet("Your counter has been deleted! Thank you for using this bot!", $tweetFrom, $tweetID);
                   }
                   else
                   {
-                    $this->myLog("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                    $arrPost = $this->formatTweet("Failed to delete counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                    log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                    $arrPost = $this->requester->formatTweet("Failed to delete counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
                   }
                   break;
 
 
                  default:    // Invalid argument
-                  $arrPost = $this->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
+                  $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
                   break;
                }
             }
@@ -320,17 +384,18 @@ class QueueConsumer
                 $sql = "INSERT INTO userbase (Username, Counter, Expiration) VALUES('$tweetFrom', 0, '$expirationDate')";
 
                 // Check if successfully added new user to DB
-                if ($this->conn->query($sql) === true)
+                $serverReply = $this->requester->sqlQuery($sql);
+                if ($serverReply === true)
                 {
-                  $this->myLog("MySQL: $tweetFrom was added to the DB!");
+                  log2file("MySQL: $tweetFrom was added to the DB!");
 
                   // Reply to original tweet, displaying COUNTER
-                  $arrPost = $this->formatTweet("Created new counter! Value = 0", $tweetFrom, $tweetID);
+                  $arrPost = $this->requester->formatTweet("Created new counter! Value = 0", $tweetFrom, $tweetID);
                 }
                 else
                 {
-                  $this->myLog("MySQL: Could not add $tweetFrom to database \r\n ERROR: $sql \r\n $this->conn->error");
-                  $arrPost = $this->formatTweet("Failed to create new counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                  log2file("MySQL: Could not add $tweetFrom to database \r\n ERROR: $sql \r\n $this->conn->error");
+                  $arrPost = $this->requester->formatTweet("Failed to create new counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
                 }
                   break;
 
@@ -339,11 +404,11 @@ class QueueConsumer
                 case "reset":
                 case "show":
                   // User tried to use the COUNTER before creating it
-                  $arrPost = $this->formatTweet("Woah there! You need to create a counter (/counter new) before doing that command!", $tweetFrom, $tweetID);
+                  $arrPost = $this->requester->formatTweet("Woah there! You need to create a counter (/counter new) before doing that command!", $tweetFrom, $tweetID);
                   break;
 
                 default: // Unknown argument for /command
-                  $arrPost = $this->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
+                  $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
                   break;
               }
             }
@@ -359,7 +424,7 @@ class QueueConsumer
             }
             else
             {
-              $arrPost = $this->formatTweet("Hey, only @SomeSeriousSith can use that command!", $tweetFrom, $tweetID);
+              $arrPost = $this->requester->formatTweet("Hey, only @SomeSeriousSith can use that command!", $tweetFrom, $tweetID);
             }
           }
           else // Invalid command
@@ -368,11 +433,11 @@ class QueueConsumer
           }
         }
 
-        if ($post)
+        if ($postReply)
         {
           // Post response tweet
-          $this->postTweet($arrPost);
-          $this->myLog('Tweet: ' . $arrPost['status']);
+          $this->requester->postTweet($arrPost);
+          log2file('Tweet posted: ' . $arrPost['status']);
         }
       }
     } // End while
@@ -382,57 +447,35 @@ class QueueConsumer
     fclose($fp);
 
     // All done with this file
-    $this->myLog('Successfully processed ' . $statusCounter . ' tweets from ' . $queueFile . ' - deleting.');
+    log2file('Successfully processed ' . $statusCounter . ' tweets from ' . $queueFile . ' - deleting.');
     unlink($queueFile);
 
     if ($stop)
     {
-      $this->conn->close();
-      exit('Mateus told me to stop!');
+      $this->requester->closeSQL();
+      log2file('Received admin command "/stop". Stopping script...');
+      exit('ADMIN told me to stop!');
     }
 
   }
+}
 
-  /**
-   * Basic log function.
-   *
-   * @see error_log()
-   * @param string $messages
-   */
-  protected function myLog($message)
-  {
-    $myFile = fopen("logConsume.log", "a") or die("Unable to open file!");
-    $timeNow = date('c');
-    $txt = $timeNow . '--' . $message . "\r\n";
-    fwrite($myFile, $txt);
-    fclose($myFile);
-  }
-
-
-  private function formatTweet($message, $tweetFrom, $tweetID)
-  {
-    $retval = array('status' => "@$tweetFrom $message \n\n Time: " . date('h:i:s A'),
-                     'in_reply_to_status_id' => $tweetID
-                   );
-    return $retval;
-  }
-
-  /**
-  * Post tweet through the twitter-api-php library
-  *
-  * @see TwitterAPIExchange.php
-  * @param $postfields parameters for the Twitter API request
-  */
-  private function postTweet($postfields)
-  {
-    $twitter = new TwitterAPIExchange($this->settings);
-
-    $twitter->buildOauth($this->url, $this->requestMethod)
-    ->setPostfields($postfields)
-    ->performRequest();
-  }
+/**
+ * Basic log function.
+ *
+ * @see error_log()
+ * @param string $messages
+ */
+function log2file($message)
+{
+  $myFile = fopen("consume.log", "a") or die("Unable to open file!");
+  $timeNow = date('Y-m-d H:i:s');
+  $txt = $timeNow . '--' . $message . "\r\n";
+  fwrite($myFile, $txt);
+  fclose($myFile);
 }
 
 // Construct consumer and start processing
-$gqc = new QueueConsumer();
-$gqc->process();
+$requester = new Requester();
+$qc = new QueueConsumer($requester);
+$qc->process();

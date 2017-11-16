@@ -44,11 +44,16 @@ class Requester
   );
 
   // Twitter API - Variables
-  private $urlTwitterRequest;
-  private $requestMethod;
+  private $urlTwitterUpdate;
+  private $urlTwitterMedia;
+
+  private $gifID;
+  private $gifIDExpiration;
 
   // GIPHY API - Constants
   const GIPHY_KEY  = 'YOUR KEY';
+
+  /* Functions */
 
   /**
   * Construct Requester Object
@@ -56,9 +61,11 @@ class Requester
   function __construct()
   {
     // Initialize variables
-    $this->urlTwitterRequest = "https://api.twitter.com/1.1/statuses/update.json";
-    $this->requestMethod = "POST";
+    $this->urlTwitterUpdate = "https://api.twitter.com/1.1/statuses/update.json";
+    $this->urlTwitterMedia = "https://upload.twitter.com/1.1/media/upload.json";
 
+    $this->gifID = 0;
+    $this->gifIDExpiration = 0;
     // Connect to DB
     $this->conn = new mysqli(self::SERVER_NAME, self::USERNAME, self::PASSWORD, self::DB_NAME);
     if ($this->conn->connect_error)
@@ -68,39 +75,45 @@ class Requester
     }
   }
 
-
-
-    public function formatTweet($message, $user = NULL, $tweetReplyID = NULL)
+  /**
+  *
+  */
+  public function formatTweet($message, $user = NULL, $tweetReplyID = NULL, $mediaID = NULL)
+  {
+    if ($mediaID != NULL)
     {
-      if ($user == NULL && $tweetReplyID = NULL)
-      {
-        // Not replying to a tweet
-        $retval = array('status' => "$message \n\n Time: " . date('h:i:s A'));
-      }
-      else
-      {
-        $retval = array('status' => "@$user $message \n\n Time: " . date('h:i:s A'),
-                         'in_reply_to_status_id' => $tweetReplyID
-                       );
-      }
-
-      return $retval;
+      $retval = array('status' => "@$user $message \n\n Time: " . date('h:i:s A'),
+                      'in_reply_to_status_id' => $tweetReplyID,
+                      'media_ids' => $mediaID
+                      );
+    }
+    else
+    {
+      $retval = array('status' => "@$user $message \n\n Time: " . date('h:i:s A'),
+                      'in_reply_to_status_id' => $tweetReplyID,
+                      );
     }
 
-    /**
-    * Post tweet through the twitter-api-php library
-    *
-    * @see TwitterAPIExchange.php
-    * @param $postfields parameters for the Twitter API request
-    */
-    public function postTweet($postfields)
-    {
-      $twitter = new TwitterAPIExchange(self::SETTINGS);
 
-      $twitter->buildOauth($this->urlTwitterRequest, $this->requestMethod)
-      ->setPostfields($postfields)
-      ->performRequest();
-    }
+
+
+    return $retval;
+  }
+
+  /**
+  * Post tweet through the twitter-api-php library
+  *
+  * @see TwitterAPIExchange.php
+  * @param $postfields parameters for the Twitter API request
+  */
+  public function postTweet($postfields)
+  {
+    $twitter = new TwitterAPIExchange(self::SETTINGS);
+
+    $twitter->buildOauth($this->urlTwitterUpdate, "POST")
+    ->setPostfields($postfields)
+    ->performRequest();
+  }
 
 
     public function sqlQuery($query)
@@ -113,6 +126,167 @@ class Requester
     public function closeSQL()
     {
       $this->conn->close();
+    }
+
+    public function requestRandomGIF($tag)
+    {
+
+      // Before getting a new gif, check if there's an active one
+      if ( $this->gifID != 0 && (time() - $this->gifIDExpiration  >= 0))
+      {
+        // Current GIF ID is still valid, return it
+        return $this->gifID;
+      }
+
+      /* ---------------------------------------- GIPHY API -------------------------------*/
+      // Initialize cURL
+      $curl = curl_init();
+      curl_setopt_array($curl, array(
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_URL => "api.giphy.com/v1/gifs/random?api_key=" . self::GIPHY_KEY . "&tag=$tag"
+      ));
+
+      // Execute Request & close connection
+      $result = curl_exec($curl);
+      curl_close($curl);
+
+      // Decode resulting JSON into associative array
+      $data = json_decode($result, TRUE);
+
+      // Save GIF in tmp folder
+      $path = "gifs/$tag.gif";
+      file_put_contents($path, fopen($data["data"]["image_url"],'r'));
+
+      /*---------------------------- TWITTER API ----------------------------*/
+      // Prepare INIT request
+      $postfields = array(
+        'command'        => 'INIT',
+        'total_bytes'    => filesize($path),
+        'media_type'     => 'image/gif',
+        'media_category' => 'tweet_gif'
+       );
+       echo "INIT ARRAY: </br>";
+       var_dump($postfields);
+
+      // Make INIT request
+      $twitter = new TwitterAPIExchange(self::SETTINGS);
+      $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
+      ->setPostfields($postfields)
+      ->performRequest();
+
+      log2file("Made INIT request!");
+      $data = json_decode($response, true);
+      echo "INIT : </br>";
+      var_dump($data);
+      $mediaID = $data["media_id"];
+
+      // APPEND requests
+
+      $rawFileData = file_get_contents($path);
+      $chunkStr = chunk_split(base64_encode($rawFileData), 2000000);
+      $chunkArr = explode("\r\n", $chunkStr);
+
+      $index = 0;
+      foreach ($chunkArr as $value)
+      {
+        // Prepare APPEND request
+        $postfields = array(
+          'command'        => 'APPEND',
+          'media_id'       => $mediaID,
+          'media_data'     => $value,
+          'media_type'     => 'image/gif',
+          'segment_index'  => $index
+         );
+         $index++;
+
+         log2file("Prepared REQUEST $index!");
+
+         // Make APPEND request
+         $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
+         ->setPostfields($postfields)
+         ->performRequest();
+
+         log2file("Made APPEND request #$index!");
+      }
+
+      // GIF has been uploaded; Prepare FINALIZE command
+
+      $postfields = array(
+        'command' => 'FINALIZE',
+        'media_id'=> $mediaID
+       );
+
+       // Make FINALIZE request
+       $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
+       ->setPostfields($postfields)
+       ->performRequest();
+
+       log2file("Made FINALIZE request!");
+
+       $data = json_decode($response, true);
+       echo 'FINALIZE: </br>';
+       var_dump($data);
+       if (isset($data['processing_info']['state']))
+       {
+         $processing = true;
+
+         // Prepare STATUS request
+         $getfield = '?command=STATUS&media_id=' . $mediaID;
+
+         while ($processing)
+         {
+           // Upload pending; Check again after waiting
+           if (isset($data['processing_info']['check_after_secs']))
+           {
+             $checkAfter = $data['processing_info']['check_after_secs'];
+             log2file("Twitter API: Processing GIF upload. Sleeping for $checkAfter seconds...");
+             sleep($checkAfter);
+           }
+
+            // Make STATUS request
+            $twitter2 = new TwitterAPIExchange(self::SETTINGS);
+            $response = $twitter2->setGetfield($getfield)
+            ->buildOauth($this->urlTwitterMedia, "GET")
+            ->performRequest();
+
+            $data = json_decode($response, true);
+            echo 'STATUS: </br>';
+            var_dump($data);
+            if ($data['processing_info']['state'] == 'failed')
+            {
+              // Something went wrong!
+              log2file("Twitter API: Could not upload $tag.gif -- STATUS returned failed");
+              $success = false;
+              $processing = false;
+            }
+            else if ($data['processing_info']['state'] == 'succeeded')
+            {
+              $success = true;
+              $processing = false;
+            }
+          }
+       }
+       elseif (isset($data['error']))
+       {
+         $success = false;
+         log2file("Twitter API: Failed to upload file $tag.gif Reason: " . $data['error']);
+       }
+       else
+       {
+         $success = true;
+       }
+       // Upload was successful
+       if ($success)
+       {
+         $mediaID = $data['media_id'];
+         $this->gifID = $mediaID;
+         $this->gifIDExpiration = time() + $data['expires_after_secs'];
+
+         log2file("Twitter API: Successfully uploaded $tag.gif");
+       }
+      // Delete GIF
+      //unlink($path);
+      return $mediaID;
     }
 }
 
@@ -226,7 +400,8 @@ class QueueConsumer
           // Check if tweet is a reply or just a new mention
           if ($isReply == NULL)
           {
-            $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID);
+            $gifID = $this->requester->requestRandomGIF("thanks");
+            $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID, $gifID);
           }
           else
           {

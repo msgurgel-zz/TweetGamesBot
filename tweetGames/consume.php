@@ -286,6 +286,288 @@ class Requester
   }
 }
 
+/**
+ *
+ */
+class ConnnectFour
+{
+  /**
+  * Class attributes
+  */
+  private $board = array();
+  private $turn;
+  private $moves = 0;
+
+  const COL = 7;
+  const ROW = 7;
+
+  public function __construct($board = NULL, $turn = NULL)
+  {
+
+    // Initialize class attributes
+    if ($board == NULL)
+    {
+      $this->board = array
+      (
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0),
+        array(0,0,0,0,0,0,0)
+      );
+    }
+    else
+    {
+      $this->board = $board;
+    }
+
+    if ($turn == NULL)
+    {
+      $this->turn = 'p1';
+    }
+    else {
+      $this->turn = $turn;
+    }
+  }
+
+  public function formatBoard()
+  {
+    $emojiEmpty = "\u{26AA}";  // White Circle
+    $emojiP1    = "\u{1F534}"; // Red Circle
+    $emojiP2    = "\u{1F535}"; // Blue Circle
+
+    $formattedStr = "";
+
+    for ($i=0; $i < self::ROW ; $i++)
+    {
+      for ($j=0; $j < self::COL ; $j++)
+      {
+        switch ($this->board[$i][$j])
+        {
+          case 0:
+            $formattedStr = $formattedStr . $emojiEmpty;
+            break;
+
+          case 1:
+            $formattedStr = $formattedStr . $emojiP1;
+            break;
+
+          case 2:
+            $formattedStr = $formattedStr . $emojiP2;
+            break;
+        }
+        if ( $j == (self::COL - 1) )
+        {
+          $formattedStr = $formattedStr . "\r\n";
+        }
+      }
+    }
+
+    return $formattedStr;
+  }
+
+  public function play($player, $colSelected)
+  {
+    $retVal = '';
+
+    if ($player == 'p1') // Player 1
+    {
+      $circle = 1;
+      $otherPlayer = 'p2';
+    }
+    else // Player 2
+    {
+      $circle = 2;
+      $otherPlayer = 'p1';
+    }
+
+    if ($this->turn == $player)
+    {
+      for ($i=self::ROW - 1; $i >= 0 ; $i--)
+      {
+        if ($this->board[$i][$colSelected] == 0)
+        {
+          $this->board[$i][$colSelected] = $circle;
+          $this->turn = $otherPlayer;
+
+          $win = $checkWin($i, $colSelected);
+
+          if ($win)
+          {
+            $retVal = 'win';
+          }
+          else
+          {
+            $retVal = 'successful move';
+          }
+
+          break;
+        }
+        if ($i == 0)
+        {
+          $retVal = 'full column';
+        }
+      }
+    }
+    else
+    {
+      $retVal = 'wrong turn';
+    }
+
+    if ($moves == self::COL * self::ROW && $retVal != 'win')
+    {
+      $retVal = 'max moves reached';
+    }
+    return $retVal;
+  }
+
+  private function checkWin($row, $col)
+  {
+    $win = $this->horizontalCheck($row, $col);
+
+    if (!$win)
+    {
+      $win = $this->verticalCheck($row, $col);
+    }
+
+    if (!$win)
+    {
+      $win = $this->diagonalCheck($row, $col);
+    }
+
+    return $win;
+  }
+
+  private function horizontalCheck($row, $col)
+  {
+    $player = $this->board[$row][$col];
+    $count = 0;
+
+    // RIGHT
+    for ($i = $col; $i < self::COL  ; $i++)
+    {
+      if ($this->board[$row][$i] !== $player || $count == 4 )
+      {
+        break;
+      }
+      $count++;
+    }
+
+    // LEFT
+    if ($count != 4)
+    {
+      for ($i = $col - 1; $i >= 0 ; $i--)
+      {
+        if ($this->board[$row][$i] !== $player || $count == 4)
+        {
+          break;
+        }
+        $count++;
+      }
+    }
+
+    return $count>=4 ? true : false;
+  }
+
+  private function verticalCheck($row, $col)
+  {
+    $player = $this->board[row][col];
+    $count = 0;
+
+    // DOWN
+    for ($i = $row; $i < self::ROW  ; $i++)
+    {
+      if ($this->board[$i][$col] !== $player || $count == 4)
+      {
+        break;
+      }
+      $count++;
+    }
+
+    // UP
+    if ($count != 4)
+    {
+      for ($i = $row - 1; $i >= 0 ; $i--)
+      {
+        if ($this->board[$i][$col] !== $player || $count == 4)
+        {
+          break;
+        }
+        $count++;
+      }
+    }
+
+    return $count>=4 ? true : false;
+  }
+
+  private function diagonalCheck($row, $col)
+  {
+    $player = $this->board[$row][$col];
+    $count = 0;
+
+    // DOWN - RIGHT
+    $i = 0;
+    while ($row + $i< self::ROW && $col + $i < self::COL)
+    {
+      if ($this->board[$row + $i][$col + $i] !== $player || $count == 4 )
+      {
+        break;
+      }
+      $count++;
+      $i++;
+    }
+
+    // UP - RIGHT
+    if ($count != 4)
+    {
+      $i = 0;
+      while ($row - $i >= 0 && $col + $i < self::COL)
+      {
+        if ($this->board[$row - $i][$col + $i] !== $player || $count == 4)
+        {
+          break;
+        }
+        $count++;
+        $i++;
+      }
+    }
+
+    // DOWN - LEFT
+    if ($count != 4)
+    {
+      $i = 0;
+      while ($row + $i < self::ROW && $col - $i >= 0)
+      {
+        if ($this->board[$row + $i][$col - $i] !== $player || $count == 4)
+        {
+          break;
+        }
+        $count++;
+        $i++;
+      }
+    }
+
+    // UP - LEFT
+    if ($count != 4)
+    {
+      $i = 0;
+      while ($row - $i >= 0 && $col - $i >= 0)
+      {
+        if ($this->board[$row - $i][$col - $i] !== $player || $count == 4)
+        {
+          break;
+        }
+        $count++;
+        $i++;
+      }
+    }
+
+    return $count>=4 ? true : false;
+  }
+}
+
 
 class QueueConsumer
 {
@@ -458,14 +740,14 @@ class QueueConsumer
               }
             }
 
-            // COUNTER COMMANDS
-            else if ($commandArray[0] == "/counter")
+            // CONNECT 4 COMMANDS
+            else if ($commandArray[0] == "/c4")
             {
-              // Grab the argurment for the /counter command
+              // Grab the argurment for the /c4 command
               $counterArg = $commandArray[1];
 
               // Get counter info from DB
-              $sql = "SELECT UserID, Counter FROM userbase WHERE Username = '$tweetFrom'";
+              $sql = "SELECT UserID, Connect4 FROM userbase WHERE Username = '$tweetFrom'";
               $serverReply = $this->requester->sqlQuery($sql);
 
               // Check if user is in the database
@@ -473,6 +755,18 @@ class QueueConsumer
               {
                  // Users in the database; grab COUNTER value
                  $userInfo = $serverReply->fetch_assoc();
+
+                 if (is_numeric($counterArg))
+                 {
+                   if ( $counterArg >= 1 && $counterArg <= 7 )
+                   {
+
+                   }
+                   else
+                   {
+                     $arrPost = $this->requester->formatTweet("Hey! Give me a value between 1 and 7!", $tweetFrom, $tweetID);
+                   }
+                 }
 
                  switch ($counterArg)
                  {

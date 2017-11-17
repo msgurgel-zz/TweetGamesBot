@@ -116,178 +116,174 @@ class Requester
   }
 
 
-    public function sqlQuery($query)
-    {
-      $serverReply = $this->conn->query($query);
+  public function sqlQuery($query)
+  {
+    $serverReply = $this->conn->query($query);
 
-      return $serverReply;
+    return $serverReply;
+  }
+
+  public function closeSQL()
+  {
+    $this->conn->close();
+  }
+
+  public function requestRandomGIF($tag)
+  {
+
+    // Before getting a new gif, check if there's an active one
+    if ( $this->gifID != 0 && (time() - $this->gifIDExpiration  >= 0))
+    {
+      // Current GIF ID is still valid, return it
+      return $this->gifID;
     }
 
-    public function closeSQL()
+    /* ---------------------------------------- GIPHY API -------------------------------*/
+    // Save GIF in tmp folder
+    $path = "gifs/$tag.gif";
+
+    // Initialize cURL
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+      CURLOPT_RETURNTRANSFER => 1,
+      CURLOPT_URL => "api.giphy.com/v1/gifs/random?api_key=" . self::GIPHY_KEY . "&tag=$tag"
+    ));
+
+    // Execute Request until GIF size is < 15 MB, then close connection
+    do
     {
-      $this->conn->close();
-    }
-
-    public function requestRandomGIF($tag)
-    {
-
-      // Before getting a new gif, check if there's an active one
-      if ( $this->gifID != 0 && (time() - $this->gifIDExpiration  >= 0))
-      {
-        // Current GIF ID is still valid, return it
-        return $this->gifID;
-      }
-
-      /* ---------------------------------------- GIPHY API -------------------------------*/
-      // Initialize cURL
-      $curl = curl_init();
-      curl_setopt_array($curl, array(
-        CURLOPT_RETURNTRANSFER => 1,
-        CURLOPT_URL => "api.giphy.com/v1/gifs/random?api_key=" . self::GIPHY_KEY . "&tag=$tag"
-      ));
-
-      // Execute Request & close connection
       $result = curl_exec($curl);
-      curl_close($curl);
-
-      // Decode resulting JSON into associative array
       $data = json_decode($result, TRUE);
-
-      // Save GIF in tmp folder
-      $path = "gifs/$tag.gif";
       file_put_contents($path, fopen($data["data"]["image_url"],'r'));
+    } while (filesize($path) >= ( 15 * (10**6) ) );
 
-      /*---------------------------- TWITTER API ----------------------------*/
-      // Prepare INIT request
+    curl_close($curl);
+
+    /*---------------------------- TWITTER API ----------------------------*/
+    // Prepare INIT request
+    $postfields = array(
+      'command'        => 'INIT',
+      'total_bytes'    => filesize($path),
+      'media_type'     => 'image/gif',
+      'media_category' => 'tweet_gif'
+     );
+
+    // Make INIT request
+    $twitter = new TwitterAPIExchange(self::SETTINGS);
+    $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
+    ->setPostfields($postfields)
+    ->performRequest();
+
+    log2file("Made INIT request!");
+    $data = json_decode($response, true);
+    $mediaID = $data["media_id"];
+
+    // APPEND requests
+
+    $rawFileData = file_get_contents($path);
+    $chunkStr = chunk_split(base64_encode($rawFileData), ( 2 * (10**6) )); // Each chunk is 2 MB big
+    $chunkArr = explode("\r\n", $chunkStr);
+
+    $index = 0;
+    foreach ($chunkArr as $value)
+    {
+      // Prepare APPEND request
       $postfields = array(
-        'command'        => 'INIT',
-        'total_bytes'    => filesize($path),
+        'command'        => 'APPEND',
+        'media_id'       => $mediaID,
+        'media_data'     => $value,
         'media_type'     => 'image/gif',
-        'media_category' => 'tweet_gif'
+        'segment_index'  => $index
        );
-       echo "INIT ARRAY: </br>";
-       var_dump($postfields);
+       $index++;
 
-      // Make INIT request
-      $twitter = new TwitterAPIExchange(self::SETTINGS);
-      $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
-      ->setPostfields($postfields)
-      ->performRequest();
+       log2file("Prepared REQUEST $index!");
 
-      log2file("Made INIT request!");
-      $data = json_decode($response, true);
-      echo "INIT : </br>";
-      var_dump($data);
-      $mediaID = $data["media_id"];
-
-      // APPEND requests
-
-      $rawFileData = file_get_contents($path);
-      $chunkStr = chunk_split(base64_encode($rawFileData), 2000000);
-      $chunkArr = explode("\r\n", $chunkStr);
-
-      $index = 0;
-      foreach ($chunkArr as $value)
-      {
-        // Prepare APPEND request
-        $postfields = array(
-          'command'        => 'APPEND',
-          'media_id'       => $mediaID,
-          'media_data'     => $value,
-          'media_type'     => 'image/gif',
-          'segment_index'  => $index
-         );
-         $index++;
-
-         log2file("Prepared REQUEST $index!");
-
-         // Make APPEND request
-         $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
-         ->setPostfields($postfields)
-         ->performRequest();
-
-         log2file("Made APPEND request #$index!");
-      }
-
-      // GIF has been uploaded; Prepare FINALIZE command
-
-      $postfields = array(
-        'command' => 'FINALIZE',
-        'media_id'=> $mediaID
-       );
-
-       // Make FINALIZE request
+       // Make APPEND request
        $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
        ->setPostfields($postfields)
        ->performRequest();
 
-       log2file("Made FINALIZE request!");
-
-       $data = json_decode($response, true);
-       echo 'FINALIZE: </br>';
-       var_dump($data);
-       if (isset($data['processing_info']['state']))
-       {
-         $processing = true;
-
-         // Prepare STATUS request
-         $getfield = '?command=STATUS&media_id=' . $mediaID;
-
-         while ($processing)
-         {
-           // Upload pending; Check again after waiting
-           if (isset($data['processing_info']['check_after_secs']))
-           {
-             $checkAfter = $data['processing_info']['check_after_secs'];
-             log2file("Twitter API: Processing GIF upload. Sleeping for $checkAfter seconds...");
-             sleep($checkAfter);
-           }
-
-            // Make STATUS request
-            $twitter2 = new TwitterAPIExchange(self::SETTINGS);
-            $response = $twitter2->setGetfield($getfield)
-            ->buildOauth($this->urlTwitterMedia, "GET")
-            ->performRequest();
-
-            $data = json_decode($response, true);
-            echo 'STATUS: </br>';
-            var_dump($data);
-            if ($data['processing_info']['state'] == 'failed')
-            {
-              // Something went wrong!
-              log2file("Twitter API: Could not upload $tag.gif -- STATUS returned failed");
-              $success = false;
-              $processing = false;
-            }
-            else if ($data['processing_info']['state'] == 'succeeded')
-            {
-              $success = true;
-              $processing = false;
-            }
-          }
-       }
-       elseif (isset($data['error']))
-       {
-         $success = false;
-         log2file("Twitter API: Failed to upload file $tag.gif Reason: " . $data['error']);
-       }
-       else
-       {
-         $success = true;
-       }
-       // Upload was successful
-       if ($success)
-       {
-         $mediaID = $data['media_id'];
-         $this->gifID = $mediaID;
-         $this->gifIDExpiration = time() + $data['expires_after_secs'];
-
-         log2file("Twitter API: Successfully uploaded $tag.gif");
-       }
-      // Delete GIF
-      //unlink($path);
-      return $mediaID;
+       log2file("Made APPEND request #$index!");
     }
+
+    // GIF has been uploaded; Prepare FINALIZE command
+
+    $postfields = array(
+      'command' => 'FINALIZE',
+      'media_id'=> $mediaID
+     );
+
+     // Make FINALIZE request
+     $response = $twitter->buildOauth($this->urlTwitterMedia, "POST")
+     ->setPostfields($postfields)
+     ->performRequest();
+
+     log2file("Made FINALIZE request!");
+
+     $data = json_decode($response, true);
+
+     if (isset($data['processing_info']['state']))
+     {
+       $processing = true;
+
+       // Prepare STATUS request
+       $getfield = '?command=STATUS&media_id=' . $mediaID;
+
+       while ($processing)
+       {
+         // Upload pending; Check again after waiting
+         if (isset($data['processing_info']['check_after_secs']))
+         {
+           $checkAfter = $data['processing_info']['check_after_secs'];
+           log2file("Twitter API: Processing GIF upload. Sleeping for $checkAfter seconds...");
+           sleep($checkAfter);
+         }
+
+          // Make STATUS request
+          $twitter2 = new TwitterAPIExchange(self::SETTINGS);
+          $response = $twitter2->setGetfield($getfield)
+          ->buildOauth($this->urlTwitterMedia, "GET")
+          ->performRequest();
+
+          $data = json_decode($response, true);
+          log2file("Made STATUS Request");
+
+          if ($data['processing_info']['state'] == 'failed')
+          {
+            // Something went wrong!
+            log2file("Twitter API: Could not upload $tag.gif -- STATUS returned failed");
+            $success = false;
+            $processing = false;
+          }
+          else if ($data['processing_info']['state'] == 'succeeded')
+          {
+            $success = true;
+            $processing = false;
+          }
+        }
+     }
+     elseif (isset($data['error']))
+     {
+       $success = false;
+       log2file("Twitter API: Failed to upload file $tag.gif Reason: " . $data['error']);
+     }
+     else
+     {
+       $success = true;
+     }
+     if ($success)
+     {
+       $mediaID = $data['media_id'];
+       $this->gifID = $mediaID;
+       $this->gifIDExpiration = time() + $data['expires_after_secs'];
+
+       log2file("Twitter API: Successfully uploaded $tag.gif");
+     }
+    // Delete GIF
+    // unlink($path);
+    return $mediaID;
+  }
 }
 
 
@@ -303,7 +299,7 @@ class QueueConsumer
   /**
    * Construct the consumer and start processing
    */
-  public function __construct($requester, $queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 5)
+  public function __construct($requester, $queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 30)
   {
     $this->queueDir = $queueDir;
     $this->filePattern = $filePattern;
@@ -382,237 +378,255 @@ class QueueConsumer
 
       $data = json_decode($rawStatus, true);
 
-      if (is_array($data) && isset($data['user']['screen_name']) && $data['entities']['user_mentions'][0]['screen_name'] == 'TweetGamesBot')
+      if (is_array($data) && isset($data['user']['screen_name']))
       {
-        // Grab data from tweet
-        $tweetFrom = $data['user']['screen_name'];    // Username of the user that mentioned the bot
-        $tweetID   = $data['id'];                     // ID of that tweet
-        $tweetText = urldecode($data['text']);        // The tweet itself
-        $isReply   = $data['in_reply_to_status_id'];  // ID of the tweet it is replying to
+        // Got answer from Twitter API; Check if bot was mentioned on tweet
+        $gotMentioned = false;
 
-        log2file('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
-        log2file(var_export($data, true));
-
-        // Look for commands in tweet
-        $commands = strchr($tweetText, '/');
-        if (!$commands) // Did not find any '/' command
+        if (isset($data['entities']['user_mentions']))
         {
-          // Check if tweet is a reply or just a new mention
-          if ($isReply == NULL)
+          // There are mentions on tweet; Check if bot is one of them
+          foreach ($data['entities']['user_mentions'] as $mention)
           {
-            $gifID = $this->requester->requestRandomGIF("thanks");
-            $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID, $gifID);
-          }
-          else
-          {
-            $post = false;
+            if ($mention['screen_name'] == 'TweetGamesBot')
+            {
+              $gotMentioned = true;
+              break;
+            }
           }
         }
-        else // Found a '/' command
+        if ($gotMentioned)
         {
-          // Grab commands and possible arguments from string
-          $commandArray = explode(" ", $commands);
+          // Grab data from tweet
+          $tweetFrom = $data['user']['screen_name'];    // Username of the user that mentioned the bot
+          $tweetID   = $data['id'];                     // ID of that tweet
+          $tweetText = urldecode($data['text']);        // The tweet itself
+          $isReply   = $data['in_reply_to_status_id'];  // ID of the tweet it is replying to
 
-          log2file('Found command in: ' .  $commands);
+          log2file('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
+          log2file(var_export($data, true));
 
-          //$v = var_export($commandArray, true);
-          //$this->myLog('Var Export: ' . $v);
-
-          // DICE COMMANDS
-          if (!strncmp($commandArray[0], '/d', 2))
+          // Look for commands in tweet
+          $commands = strchr($tweetText, '/');
+          if (!$commands) // Did not find any '/' command
           {
-            $dieNum = substr($commandArray[0], 2);
-            // Dice available: D4, D6, D8, D10, D12, D20, and D100
-            switch ($commandArray[0])
+            // Check if tweet is a reply or just a new mention
+            if ($isReply == NULL)
             {
-              case "/d4":
-              case "/d6":
-              case "/d8":
-              case "/d10":
-              case "/d12":
-              case "/d20":
-              case "/d100":
-              $arrPost = $this->requester->formatTweet("Roll the die! D$dieNum result = " . rand(1, $dieNum), $tweetFrom, $tweetID);
-                break;
-
-              case "/d4c":
-              $arrPost = $this->requester->formatTweet("Did you mean: Filthy Acts at a Reasonable Price?", $tweetFrom, $tweetID);
-                break;
-
-              default:
-              $arrPost = $requester->formatTweet("ERROR 404: Die not found: " . $commandArray[0], $tweetFrom, $tweetID);
-                break;
-            }
-          }
-
-          // COUNTER COMMANDS
-          else if ($commandArray[0] == "/counter")
-          {
-            // Grab the argurment for the /counter command
-            $counterArg = $commandArray[1];
-
-            // Get counter info from DB
-            $sql = "SELECT UserID, Counter FROM userbase WHERE Username = '$tweetFrom'";
-            $serverReply = $this->requester->sqlQuery($sql);
-
-            // Check if user is in the database
-            if ($serverReply->num_rows == 1)
-            {
-               // Users in the database; grab COUNTER value
-               $userInfo = $serverReply->fetch_assoc();
-
-               switch ($counterArg)
-               {
-                 case "inc": // Increment counter
-                 $sql = "UPDATE userbase SET Counter = Counter + 1 WHERE UserID = " .  $userInfo["UserID"];
-                 $serverReply = $this->requester->sqlQuery($sql);
-
-                 if ($serverReply === true)
-                 {
-                   log2file("MySQL: Counter from $tweetFrom was incremented. Current Value = " . ($userInfo["Counter"] + 1) );
-
-                   // Reply to original tweet, displaying COUNTER
-                   $arrPost = $this->requester->formatTweet("Incrementing counter! New value = " . ($userInfo["Counter"] + 1), $tweetFrom, $tweetID);
-                 }
-                 else
-                 {
-                   log2file("MySQL: Could not increment counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                   $arrPost = $this->requester->formatTweet("Failed to increment counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                 }
-                 break;
-
-                 case "dec": // Decrement counter
-
-                 $sql = "UPDATE userbase SET Counter = Counter - 1 WHERE UserID = " . $userInfo["UserID"];
-                 $serverReply = $this->requester->sqlQuery($sql);
-
-                 if ($serverReply === true)
-                 {
-                   log2file("MySQL: Counter from $tweetFrom was decremented. Current Value = " . ($userInfo["Counter"] - 1) );
-
-                   // Reply to original tweet, displaying COUNTER
-                   $arrPost = $this->requester->formatTweet("Decrementing counter! New value = " . ($userInfo["Counter"] - 1), $tweetFrom, $tweetID);
-                 }
-                 else
-                 {
-                   log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                   $arrPost = $this->requester->formatTweet("Failed to decrement counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                 }
-                 break;
-
-                  case "reset": // reset counter
-
-                  $sql = "UPDATE userbase SET Counter = 0 WHERE UserID = " . $userInfo["UserID"];
-                  $serverReply = $this->requester->sqlQuery($sql);
-                  if ($serverReply === true)
-                  {
-                    log2file("MySQL: Counter from $tweetFrom was set to 0");
-
-                    // Reply to original tweet, displaying COUNTER
-                    $arrPost = $this->requester->formatTweet("Resetting counter! New value = 0", $tweetFrom, $tweetID);
-                  }
-                  else
-                  {
-                    log2file("MySQL: Could not reset counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                    $arrPost = $this->requester->formatTweet("Failed to reset counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                  }
-                  break;
-
-                  case "show": // Display counter
-                  $arrPost = $this->requester->formatTweet("Here you go! Counter = " . $userInfo["Counter"], $tweetFrom, $tweetID);
-                  break;
-
-                  case "delete": // Delete counter - As of now, that removes the user from the DB
-                  $sql = "DELETE FROM userbase WHERE UserID = " . $userInfo["UserID"];
-                  $serverReply = $this->requester->sqlQuery($sql);
-                  if ($serverReply === true)
-                  {
-                    log2file("MySQL: Deleted $tweetFrom from DB");
-
-                    // Reply to original tweet, displaying COUNTER
-                    $arrPost = $this->requester->formatTweet("Your counter has been deleted! Thank you for using this bot!", $tweetFrom, $tweetID);
-                  }
-                  else
-                  {
-                    log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                    $arrPost = $this->requester->formatTweet("Failed to delete counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                  }
-                  break;
-
-
-                 default:    // Invalid argument
-                  $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
-                  break;
-               }
-            }
-            else // User not in the database
-            {
-              switch ($counterArg)
-              {
-                case "new": // Add user to database, creating a new COUNTER
-
-                // $expirationDate = time() + (1 * 24 * 60 * 60);
-                                          // 1 day; 24 hours; 60 mins; 60 secs
-                $expirationDate = time() + (10 * 60);
-                                          // 10 mins; 60 secs
-                $expirationDate = date('Y-m-d H:i:s', $expirationDate);
-                $sql = "INSERT INTO userbase (Username, Counter, Expiration) VALUES('$tweetFrom', 0, '$expirationDate')";
-
-                // Check if successfully added new user to DB
-                $serverReply = $this->requester->sqlQuery($sql);
-                if ($serverReply === true)
-                {
-                  log2file("MySQL: $tweetFrom was added to the DB!");
-
-                  // Reply to original tweet, displaying COUNTER
-                  $arrPost = $this->requester->formatTweet("Created new counter! Value = 0", $tweetFrom, $tweetID);
-                }
-                else
-                {
-                  log2file("MySQL: Could not add $tweetFrom to database \r\n ERROR: $sql \r\n $this->conn->error");
-                  $arrPost = $this->requester->formatTweet("Failed to create new counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                }
-                  break;
-
-                case "inc":
-                case "dec":
-                case "reset":
-                case "show":
-                  // User tried to use the COUNTER before creating it
-                  $arrPost = $this->requester->formatTweet("Woah there! You need to create a counter (/counter new) before doing that command!", $tweetFrom, $tweetID);
-                  break;
-
-                default: // Unknown argument for /command
-                  $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
-                  break;
-              }
-            }
-          }
-
-          // ADMIN COMMANDS
-          else if ($commandArray[0] == "/stop")
-          {
-            if ($tweetFrom == 'SomeSeriousSith')
-            {
-              $stop = true;
-              break;
+              //$gifID = $this->requester->requestRandomGIF("thanks");
+              $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID);
             }
             else
             {
-              $arrPost = $this->requester->formatTweet("Hey, only @SomeSeriousSith can use that command!", $tweetFrom, $tweetID);
+              $postReply = false;
             }
           }
-          else // Invalid command
+          else // Found a '/' command
           {
-            $post = false;
-          }
-        }
+            // Grab commands and possible arguments from string
+            $commandArray = explode(" ", $commands);
 
-        if ($postReply)
-        {
-          // Post response tweet
-          $this->requester->postTweet($arrPost);
-          log2file('Tweet posted: ' . $arrPost['status']);
+            log2file('Found command in: ' .  $commands);
+
+            //$v = var_export($commandArray, true);
+            //$this->myLog('Var Export: ' . $v);
+
+            // DICE COMMANDS
+            if (!strncmp($commandArray[0], '/d', 2))
+            {
+              $dieNum = substr($commandArray[0], 2);
+              // Dice available: D4, D6, D8, D10, D12, D20, and D100
+              switch ($commandArray[0])
+              {
+                case "/d4":
+                case "/d6":
+                case "/d8":
+                case "/d10":
+                case "/d12":
+                case "/d20":
+                case "/d100":
+                $arrPost = $this->requester->formatTweet("Roll the die! D$dieNum result = " . rand(1, $dieNum), $tweetFrom, $tweetID);
+                  break;
+
+                case "/d4c":
+                $arrPost = $this->requester->formatTweet("Did you mean: Filthy Acts at a Reasonable Price?", $tweetFrom, $tweetID);
+                  break;
+
+                default:
+                $arrPost = $requester->formatTweet("ERROR 404: Die not found: " . $commandArray[0], $tweetFrom, $tweetID);
+                  break;
+              }
+            }
+
+            // COUNTER COMMANDS
+            else if ($commandArray[0] == "/counter")
+            {
+              // Grab the argurment for the /counter command
+              $counterArg = $commandArray[1];
+
+              // Get counter info from DB
+              $sql = "SELECT UserID, Counter FROM userbase WHERE Username = '$tweetFrom'";
+              $serverReply = $this->requester->sqlQuery($sql);
+
+              // Check if user is in the database
+              if ($serverReply->num_rows == 1)
+              {
+                 // Users in the database; grab COUNTER value
+                 $userInfo = $serverReply->fetch_assoc();
+
+                 switch ($counterArg)
+                 {
+                   case "inc": // Increment counter
+                   $sql = "UPDATE userbase SET Counter = Counter + 1 WHERE UserID = " .  $userInfo["UserID"];
+                   $serverReply = $this->requester->sqlQuery($sql);
+
+                   if ($serverReply === true)
+                   {
+                     log2file("MySQL: Counter from $tweetFrom was incremented. Current Value = " . ($userInfo["Counter"] + 1) );
+
+                     // Reply to original tweet, displaying COUNTER
+                     $arrPost = $this->requester->formatTweet("Incrementing counter! New value = " . ($userInfo["Counter"] + 1), $tweetFrom, $tweetID);
+                   }
+                   else
+                   {
+                     log2file("MySQL: Could not increment counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                     $arrPost = $this->requester->formatTweet("Failed to increment counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                   }
+                   break;
+
+                   case "dec": // Decrement counter
+
+                   $sql = "UPDATE userbase SET Counter = Counter - 1 WHERE UserID = " . $userInfo["UserID"];
+                   $serverReply = $this->requester->sqlQuery($sql);
+
+                   if ($serverReply === true)
+                   {
+                     log2file("MySQL: Counter from $tweetFrom was decremented. Current Value = " . ($userInfo["Counter"] - 1) );
+
+                     // Reply to original tweet, displaying COUNTER
+                     $arrPost = $this->requester->formatTweet("Decrementing counter! New value = " . ($userInfo["Counter"] - 1), $tweetFrom, $tweetID);
+                   }
+                   else
+                   {
+                     log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                     $arrPost = $this->requester->formatTweet("Failed to decrement counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                   }
+                   break;
+
+                    case "reset": // reset counter
+
+                    $sql = "UPDATE userbase SET Counter = 0 WHERE UserID = " . $userInfo["UserID"];
+                    $serverReply = $this->requester->sqlQuery($sql);
+                    if ($serverReply === true)
+                    {
+                      log2file("MySQL: Counter from $tweetFrom was set to 0");
+
+                      // Reply to original tweet, displaying COUNTER
+                      $arrPost = $this->requester->formatTweet("Resetting counter! New value = 0", $tweetFrom, $tweetID);
+                    }
+                    else
+                    {
+                      log2file("MySQL: Could not reset counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                      $arrPost = $this->requester->formatTweet("Failed to reset counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                    }
+                    break;
+
+                    case "show": // Display counter
+                    $arrPost = $this->requester->formatTweet("Here you go! Counter = " . $userInfo["Counter"], $tweetFrom, $tweetID);
+                    break;
+
+                    case "delete": // Delete counter - As of now, that removes the user from the DB
+                    $sql = "DELETE FROM userbase WHERE UserID = " . $userInfo["UserID"];
+                    $serverReply = $this->requester->sqlQuery($sql);
+                    if ($serverReply === true)
+                    {
+                      log2file("MySQL: Deleted $tweetFrom from DB");
+
+                      // Reply to original tweet, displaying COUNTER
+                      $arrPost = $this->requester->formatTweet("Your counter has been deleted! Thank you for using this bot!", $tweetFrom, $tweetID);
+                    }
+                    else
+                    {
+                      log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                      $arrPost = $this->requester->formatTweet("Failed to delete counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                    }
+                    break;
+
+
+                   default:    // Invalid argument
+                    $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
+                    break;
+                 }
+              }
+              else // User not in the database
+              {
+                switch ($counterArg)
+                {
+                  case "new": // Add user to database, creating a new COUNTER
+
+                  // $expirationDate = time() + (1 * 24 * 60 * 60);
+                                            // 1 day; 24 hours; 60 mins; 60 secs
+                  $expirationDate = time() + (10 * 60);
+                                            // 10 mins; 60 secs
+                  $expirationDate = date('Y-m-d H:i:s', $expirationDate);
+                  $sql = "INSERT INTO userbase (Username, Counter, Expiration) VALUES('$tweetFrom', 0, '$expirationDate')";
+
+                  // Check if successfully added new user to DB
+                  $serverReply = $this->requester->sqlQuery($sql);
+                  if ($serverReply === true)
+                  {
+                    log2file("MySQL: $tweetFrom was added to the DB!");
+
+                    // Reply to original tweet, displaying COUNTER
+                    $arrPost = $this->requester->formatTweet("Created new counter! Value = 0", $tweetFrom, $tweetID);
+                  }
+                  else
+                  {
+                    log2file("MySQL: Could not add $tweetFrom to database \r\n ERROR: $sql \r\n $this->conn->error");
+                    $arrPost = $this->requester->formatTweet("Failed to create new counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                  }
+                    break;
+
+                  case "inc":
+                  case "dec":
+                  case "reset":
+                  case "show":
+                    // User tried to use the COUNTER before creating it
+                    $arrPost = $this->requester->formatTweet("Woah there! You need to create a counter (/counter new) before doing that command!", $tweetFrom, $tweetID);
+                    break;
+
+                  default: // Unknown argument for /command
+                    $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
+                    break;
+                }
+              }
+            }
+
+            // ADMIN COMMANDS
+            else if ($commandArray[0] == "/stop")
+            {
+              if ($tweetFrom == 'SomeSeriousSith')
+              {
+                $stop = true;
+                break;
+              }
+              else
+              {
+                $arrPost = $this->requester->formatTweet("Hey, only @SomeSeriousSith can use that command!", $tweetFrom, $tweetID);
+              }
+            }
+            else // Invalid command
+            {
+              $post = false;
+            }
+          }
+
+          if ($postReply)
+          {
+            // Post response tweet
+            $this->requester->postTweet($arrPost);
+            log2file('Tweet posted: ' . $arrPost['status']);
+          }
         }
       }
     } // End while

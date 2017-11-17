@@ -42,7 +42,7 @@ class QueueCollector extends OauthPhirehose
    * @param string $queueDir Directory where queue files are stored. Default = ./tmp
    * @param integer $rotateInterval Time in sec that determines when to rotate current queue file. Default = 5
    */
-  public function __construct($username, $password, $queueDir = './tmp', $rotateInterval = 5)
+  public function __construct($username, $password, $queueDir = './tmp', $rotateInterval = 30)
   {
     // Sanity check
     if ($rotateInterval < 5)

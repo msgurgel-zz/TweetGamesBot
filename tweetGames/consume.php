@@ -854,8 +854,12 @@ class QueueConsumer
                    }
                    else // not replying to the correct tweet
                    {
-                     $arrPost = $this->requester->formatTweet("You have a game running in another tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
-                     $wrongReply = true;
+                     // If the replied to the wrong tweet and does not want to reset the game...
+                     if (!$c4Arg == 'new')
+                     {
+                       $arrPost = $this->requester->formatTweet("You have a game running in another tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
+                       $wrongReply = true;
+                     }
                    }
 
                    if ($isArgValidNumeric && !$wrongReply) // Play Circle arguments

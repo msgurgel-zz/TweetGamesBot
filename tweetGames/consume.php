@@ -345,6 +345,14 @@ class Requester
      $emojiP1    = "\u{1F369}"; // DOUGHNUT
      $emojiP2    = "\u{1F36A}"; // COOKIE
 
+     $emojiOne    = "\u{0031}" . "\u{20E3}";
+     $emojiTwo    = "\u{0032}" . "\u{20E3}";
+     $emojiThree  = "\u{0033}" . "\u{20E3}";
+     $emojiFour   = "\u{0034}" . "\u{20E3}";
+     $emojiFive   = "\u{0035}" . "\u{20E3}";
+     $emojiSix    = "\u{0036}" . "\u{20E3}";
+     $emojiSeven  = "\u{0037}" . "\u{20E3}";
+
      //$emojiEmpty = "\u{1F518}";  // Radio Button
      //$emojiP1    = "\u{1F534}"; // Red Circle
      //$emojiP2    = "\u{1F535}"; // Blue Circle
@@ -352,7 +360,7 @@ class Requester
      $formattedStr = "";
 
      // Add column's index to the top of the board
-     $formattedStr = "1 2 3 4 5 6 7\n";
+     $formattedStr = $emojiOne . $emojiTwo . $emojiThree . $emojiFour . $emojiFive . $emojiSix . $emojiSeven . "\n";
 
      for ($i=0; $i < self::ROW ; $i++)
      {

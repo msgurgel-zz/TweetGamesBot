@@ -351,6 +351,9 @@ class Requester
 
      $formattedStr = "";
 
+     // Add column's index to the top of the board
+     $formattedStr = "1 2 3 4 5 6 7\n";
+
      for ($i=0; $i < self::ROW ; $i++)
      {
        for ($j=0; $j < self::COL ; $j++)

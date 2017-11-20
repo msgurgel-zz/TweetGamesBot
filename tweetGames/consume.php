@@ -439,7 +439,6 @@ class Requester
            if ($win)
            {
              $retVal = 'win';
-             break;
            }
            else
            {

@@ -842,11 +842,11 @@ class QueueConsumer
 
                      if ($tweetFrom == $userInfo['Username'])
                      {
-                       $player = 'p1';
+                       $currentPlayer = 'p1';
                      }
                      else // $tweetFrom == $userInfo['Player2']
                      {
-                       $player = 'p2';
+                       $currentPlayer = 'p2';
                      }
                    }
                    else // not replying to the correct tweet
@@ -858,29 +858,32 @@ class QueueConsumer
                    if ($isArgValidNumeric && !$wrongReply) // Play Circle arguments
                    {
 
-                    $playResult = $c4->play($player, $c4Arg);
+                    $playResult = $c4->play($currentPlayer, $c4Arg);
                     $board = $c4->formatBoard();
                     $boardStr = $c4->outputBoard();
 
-                    // Switch current player for printing Turn
-                    if ($player == 'p1')
+                    if ($playResult == 'successful move')
                     {
-                      $player = 'Player 1';
-                      $turn = 'Player 2';
-                      $dbTurn = 'p2';
+                      // Switch current player for printing turn
+                      if ($currentPlayer == 'p1')
+                      {
+                        $playerTurn = $data['Player2'];
+                        $dbTurn = 'p2';
+                      }
+                      else // $currentPlayer == 'p2'
+                      {
+                        $playerTurn = $data['Username'];
+                        $dbTurn = 'p1';
+                      }
                     }
-                    else
-                    {
-                      $player = 'Player 2';
-                      $turn = 'Player 1';
-                      $dbTurn = 'p1';
-                    }
+
 
                     switch ($playResult)
                     {
                       case 'successful move':
-                        $arrPost = $this->requester->formatTweet("$board\n Turn: $turn", $tweetFrom, $tweetID);
-                        $grabTweetID = true;
+                        $arrPost = $this->requester->formatTweet("$board\n Turn: $playerTurn", $tweetFrom, $tweetID);
+                        $grabTweetID = true; // Update TweetID in DB
+
                         $sql = "UPDATE userbase SET Turn = '$dbTurn', Connect4 = '$boardStr'  WHERE UserID = " .  $userInfo["UserID"];
                         $serverReply = $this->requester->sqlQuery($sql);
                         if ($serverReply === true)
@@ -899,12 +902,12 @@ class QueueConsumer
                         break;
 
                       case 'wrong turn':
-                        $arrPost = $this->requester->formatTweet("$board\n Hey! It's not your turn!\n\nTurn: $player", $tweetFrom, $tweetID);
+                        $arrPost = $this->requester->formatTweet("$board\n Hey! It's not your turn!\n\nTurn: $playerTurn", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
 
                       case 'full column':
-                        $arrPost = $this->requester->formatTweet("$board\n That column is full. Try another one\n\nTurn: $player", $tweetFrom, $tweetID);
+                        $arrPost = $this->requester->formatTweet("$board\n That column is full. Try another one\n\nTurn: $playerTurn", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
 
@@ -984,12 +987,12 @@ class QueueConsumer
                   log2file("MySQL: Connect4 from $tweetFrom was reset");
 
                   // Reply to original tweet, displaying new game
-                  $c4 = new ConnectFour();
-                  $board   =  $c4->formatBoard();
-                  $turn    = 'Player 1';
-                  $player1 = '@'. $tweetFrom;
-                  $player2 = '@'. $c4Player2;
-                  $arrPost = $this->requester->formatTweet("$board\nPlayer1: $player1\nPlayer2: $player2\nTurn: $turn\n\n", $tweetFrom, $tweetID);
+                  $c4         = new ConnectFour();
+                  $board      =  $c4->formatBoard();
+                  $playerTurn = $tweetFrom;
+                  $player1    = '@'. $tweetFrom;
+                  $player2    = '@'. $c4Player2;
+                  $arrPost    = $this->requester->formatTweet("$board\nPlayer1: $player1\nPlayer2: $player2\nTurn: $playerTurn\n\n", $tweetFrom, $tweetID);
 
                   $grabTweetID = true;
                 }

@@ -825,7 +825,7 @@ class QueueConsumer
               if ($isArgValidCommand || $isArgValidNumeric)
               {
                 // Check if user is in DATABASE
-                $sql = "SELECT UserID, Username, Connect4, OGTweetID, Player2, Turn FROM userbase WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
+                $sql = "SELECT UserID, Username, Connect4, TweetID, Player2, Turn FROM userbase WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
                 $serverReply = $this->requester->sqlQuery($sql);
                 if ($serverReply->num_rows == 1)
                 {
@@ -835,7 +835,7 @@ class QueueConsumer
                    $userInfo = $serverReply->fetch_assoc();
 
                    // Check if user is replying to the right tweet
-                   if ($userInfo['OGTweetID'] == $replyID)
+                   if ($userInfo['TweetID'] == $replyID)
                    {
                      // Replying to the correct tweet; Create new board with info from DB
                      $c4 = new ConnectFour($userInfo['Connect4'], $userInfo['Turn']);
@@ -1030,15 +1030,15 @@ class QueueConsumer
             {
               $responseTwID = $response['id'];
               // Update database!
-              $sql = "UPDATE userbase SET OGTweetID = $responseTwID WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
+              $sql = "UPDATE userbase SET TweetID = $responseTwID WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
               $serverReply = $this->requester->sqlQuery($sql);
               if ($serverReply === true)
               {
-                log2file("MySQL: Successfully added OGTweetID to $tweetFrom");
+                log2file("MySQL: Successfully added TweetID to $tweetFrom");
               }
               else
               {
-                log2file("MySQL: Failed to add OGTweetID to $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                log2file("MySQL: Failed to add TweetID to $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
               }
             }
           }

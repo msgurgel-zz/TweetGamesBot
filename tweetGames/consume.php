@@ -110,9 +110,11 @@ class Requester
   {
     $twitter = new TwitterAPIExchange(self::SETTINGS);
 
-    $twitter->buildOauth($this->urlTwitterUpdate, "POST")
+    $twResponse = $twitter->buildOauth($this->urlTwitterUpdate, "POST")
     ->setPostfields($postfields)
     ->performRequest();
+
+    return json_decode($twResponse, true);
   }
 
 
@@ -289,284 +291,308 @@ class Requester
 /**
  *
  */
-class ConnnectFour
-{
-  /**
-  * Class attributes
-  */
-  private $board = array();
-  private $turn;
-  private $moves = 0;
+ class ConnectFour
+ {
+   /**
+   * Class attributes
+   */
+   private $board = array();
+   private $turn;
+   private $moves = 0;
 
-  const COL = 7;
-  const ROW = 7;
+   const COL = 7;
+   const ROW = 7;
 
-  public function __construct($board = NULL, $turn = NULL)
-  {
+   public function __construct($board = NULL, $turn = NULL)
+   {
 
-    // Initialize class attributes
-    if ($board == NULL)
-    {
-      $this->board = array
-      (
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0),
-        array(0,0,0,0,0,0,0)
-      );
-    }
-    else
-    {
-      $this->board = $board;
-    }
+     // Initialize class attributes
+     $this->board = array
+     (
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0),
+       array(0,0,0,0,0,0,0)
+     );
 
-    if ($turn == NULL)
-    {
-      $this->turn = 'p1';
-    }
-    else {
-      $this->turn = $turn;
-    }
-  }
+     if ($board != NULL)
+     {
+       for ($i=0; $i < self::ROW ; $i++)
+       {
+         for ($j=0; $j < self::COL ; $j++)
+         {
+           $this->board[$i][$j] = substr($board, self::COL * $i + $j, 1);
+         }
+       }
+     }
 
-  public function formatBoard()
-  {
-    $emojiEmpty = "\u{26AA}";  // White Circle
-    $emojiP1    = "\u{1F534}"; // Red Circle
-    $emojiP2    = "\u{1F535}"; // Blue Circle
+     if ($turn == NULL)
+     {
+       $this->turn = 'p1';
+     }
+     else
+     {
+       $this->turn = $turn;
+     }
+   }
 
-    $formattedStr = "";
+   public function formatBoard()
+   {
+     $emojiEmpty = "\{u26AA}"; // WHITE CIRCLE
+     //$emojiEmpty = "\u{1F518}";  // Radio Button
+     $emojiP1    = "\u{1F534}"; // Red Circle
+     $emojiP2    = "\u{1F535}"; // Blue Circle
 
-    for ($i=0; $i < self::ROW ; $i++)
-    {
-      for ($j=0; $j < self::COL ; $j++)
-      {
-        switch ($this->board[$i][$j])
-        {
-          case 0:
-            $formattedStr = $formattedStr . $emojiEmpty;
-            break;
+     $formattedStr = "";
 
-          case 1:
-            $formattedStr = $formattedStr . $emojiP1;
-            break;
+     for ($i=0; $i < self::ROW ; $i++)
+     {
+       for ($j=0; $j < self::COL ; $j++)
+       {
+         switch ($this->board[$i][$j])
+         {
+           case 0:
+             $formattedStr = $formattedStr . $emojiEmpty;
+             break;
 
-          case 2:
-            $formattedStr = $formattedStr . $emojiP2;
-            break;
-        }
-        if ( $j == (self::COL - 1) )
-        {
-          $formattedStr = $formattedStr . "\r\n";
-        }
-      }
-    }
+           case 1:
+             $formattedStr = $formattedStr . $emojiP1;
+             break;
 
-    return $formattedStr;
-  }
+           case 2:
+             $formattedStr = $formattedStr . $emojiP2;
+             break;
+         }
+         if ( $j == (self::COL - 1) )
+         {
+           $formattedStr = $formattedStr . "\r\n";
+         }
+       }
+     }
 
-  public function play($player, $colSelected)
-  {
-    $retVal = '';
+     return $formattedStr;
+   }
 
-    if ($player == 'p1') // Player 1
-    {
-      $circle = 1;
-      $otherPlayer = 'p2';
-    }
-    else // Player 2
-    {
-      $circle = 2;
-      $otherPlayer = 'p1';
-    }
 
-    if ($this->turn == $player)
-    {
-      for ($i=self::ROW - 1; $i >= 0 ; $i--)
-      {
-        if ($this->board[$i][$colSelected] == 0)
-        {
-          $this->board[$i][$colSelected] = $circle;
-          $this->turn = $otherPlayer;
+   public function outputBoard()
+   {
+     $boardStr = '';
 
-          $win = $checkWin($i, $colSelected);
+     for ($i=0; $i < self::ROW ; $i++)
+     {
+       for ($j=0; $j < self::COL ; $j++)
+       {
+         $boardStr = $boardStr . $this->board[$i][$j];
+       }
+     }
 
-          if ($win)
-          {
-            $retVal = 'win';
-          }
-          else
-          {
-            $retVal = 'successful move';
-          }
+     return $boardStr;
+   }
 
-          break;
-        }
-        if ($i == 0)
-        {
-          $retVal = 'full column';
-        }
-      }
-    }
-    else
-    {
-      $retVal = 'wrong turn';
-    }
+   public function play($player, $colSelected)
+   {
+     $retVal = '';
+     $win = false;
 
-    if ($moves == self::COL * self::ROW && $retVal != 'win')
-    {
-      $retVal = 'max moves reached';
-    }
-    return $retVal;
-  }
+     if ($player == 'p1') // Player 1
+     {
+       $circle = 1;
+       $otherPlayer = 'p2';
+     }
+     else // Player 2
+     {
+       $circle = 2;
+       $otherPlayer = 'p1';
+     }
 
-  private function checkWin($row, $col)
-  {
-    $win = $this->horizontalCheck($row, $col);
+     if ($this->turn == $player)
+     {
+       for ($i=self::ROW - 1; $i >= 0 ; $i--)
+       {
+         if ($this->board[$i][$colSelected] == 0)
+         {
+           $this->board[$i][$colSelected] = $circle;
+           $this->turn = $otherPlayer;
 
-    if (!$win)
-    {
-      $win = $this->verticalCheck($row, $col);
-    }
+           $win = $this->checkWin($i, $colSelected);
 
-    if (!$win)
-    {
-      $win = $this->diagonalCheck($row, $col);
-    }
+           if ($win)
+           {
+             $retVal = 'win';
+           }
+           else
+           {
+             $retVal = 'successful move';
+           }
 
-    return $win;
-  }
+           break;
+         }
+         if ($i == 0)
+         {
+           $retVal = 'full column';
+         }
+       }
+     }
+     else
+     {
+       $retVal = 'wrong turn';
+     }
 
-  private function horizontalCheck($row, $col)
-  {
-    $player = $this->board[$row][$col];
-    $count = 0;
+     if ($this->moves == self::COL * self::ROW && $retVal != 'win')
+     {
+       $retVal = 'max moves';
+     }
+     return $retVal;
+   }
 
-    // RIGHT
-    for ($i = $col; $i < self::COL  ; $i++)
-    {
-      if ($this->board[$row][$i] !== $player || $count == 4 )
-      {
-        break;
-      }
-      $count++;
-    }
+   private function checkWin($row, $col)
+   {
 
-    // LEFT
-    if ($count != 4)
-    {
-      for ($i = $col - 1; $i >= 0 ; $i--)
-      {
-        if ($this->board[$row][$i] !== $player || $count == 4)
-        {
-          break;
-        }
-        $count++;
-      }
-    }
+     $winner = $this->horizontalCheck($row, $col);
 
-    return $count>=4 ? true : false;
-  }
+     if (!$winner)
+     {
+       $winner = $this->verticalCheck($row, $col);
+     }
 
-  private function verticalCheck($row, $col)
-  {
-    $player = $this->board[row][col];
-    $count = 0;
+     if (!$winner)
+     {
+       $winner = $this->diagonalCheck($row, $col);
+     }
 
-    // DOWN
-    for ($i = $row; $i < self::ROW  ; $i++)
-    {
-      if ($this->board[$i][$col] !== $player || $count == 4)
-      {
-        break;
-      }
-      $count++;
-    }
+     return $winner;
+   }
 
-    // UP
-    if ($count != 4)
-    {
-      for ($i = $row - 1; $i >= 0 ; $i--)
-      {
-        if ($this->board[$i][$col] !== $player || $count == 4)
-        {
-          break;
-        }
-        $count++;
-      }
-    }
+   private function horizontalCheck($row, $col)
+   {
+     $player = $this->board[$row][$col];
+     $count = 0;
 
-    return $count>=4 ? true : false;
-  }
+     // RIGHT
+     for ($i = $col; $i < self::COL  ; $i++)
+     {
+       if ($this->board[$row][$i] !== $player || $count == 4 )
+       {
+         break;
+       }
+       $count++;
+     }
 
-  private function diagonalCheck($row, $col)
-  {
-    $player = $this->board[$row][$col];
-    $count = 0;
+     // LEFT
+     if ($count != 4)
+     {
+       for ($i = $col - 1; $i >= 0 ; $i--)
+       {
+         if ($this->board[$row][$i] !== $player || $count == 4)
+         {
+           break;
+         }
+         $count++;
+       }
+     }
 
-    // DOWN - RIGHT
-    $i = 0;
-    while ($row + $i< self::ROW && $col + $i < self::COL)
-    {
-      if ($this->board[$row + $i][$col + $i] !== $player || $count == 4 )
-      {
-        break;
-      }
-      $count++;
-      $i++;
-    }
+     return $count>=4 ? true : false;
+   }
 
-    // UP - RIGHT
-    if ($count != 4)
-    {
-      $i = 0;
-      while ($row - $i >= 0 && $col + $i < self::COL)
-      {
-        if ($this->board[$row - $i][$col + $i] !== $player || $count == 4)
-        {
-          break;
-        }
-        $count++;
-        $i++;
-      }
-    }
+   private function verticalCheck($row, $col)
+   {
+     $player = $this->board[$row][$col];
+     $count = 0;
 
-    // DOWN - LEFT
-    if ($count != 4)
-    {
-      $i = 0;
-      while ($row + $i < self::ROW && $col - $i >= 0)
-      {
-        if ($this->board[$row + $i][$col - $i] !== $player || $count == 4)
-        {
-          break;
-        }
-        $count++;
-        $i++;
-      }
-    }
+     // DOWN
+     for ($i = $row; $i < self::ROW  ; $i++)
+     {
+       if ($this->board[$i][$col] !== $player || $count == 4)
+       {
+         break;
+       }
+       $count++;
+     }
 
-    // UP - LEFT
-    if ($count != 4)
-    {
-      $i = 0;
-      while ($row - $i >= 0 && $col - $i >= 0)
-      {
-        if ($this->board[$row - $i][$col - $i] !== $player || $count == 4)
-        {
-          break;
-        }
-        $count++;
-        $i++;
-      }
-    }
+     // UP
+     if ($count != 4)
+     {
+       for ($i = $row - 1; $i >= 0 ; $i--)
+       {
+         if ($this->board[$i][$col] !== $player || $count == 4)
+         {
+           break;
+         }
+         $count++;
+       }
+     }
+     return $count>=4 ? true : false;
+   }
 
-    return $count>=4 ? true : false;
-  }
-}
+   private function diagonalCheck($row, $col)
+   {
+     $player = $this->board[$row][$col];
+     $count = 0;
+
+     // DOWN - RIGHT
+     $i = 0;
+     while ($row + $i< self::ROW && $col + $i < self::COL)
+     {
+       if ($this->board[$row + $i][$col + $i] !== $player || $count == 4 )
+       {
+         break;
+       }
+       $count++;
+       $i++;
+     }
+
+     // UP - RIGHT
+     if ($count != 4)
+     {
+       $i = 1; // Ignore [$row][$col]
+       while ($row - $i >= 0 && $col + $i < self::COL)
+       {
+         if ($this->board[$row - $i][$col + $i] !== $player || $count == 4)
+         {
+           break;
+         }
+         $count++;
+         $i++;
+       }
+     }
+
+     // DOWN - LEFT
+     if ($count != 4)
+     {
+       $i = 1;
+       while ($row + $i < self::ROW && $col - $i >= 0)
+       {
+         if ($this->board[$row + $i][$col - $i] !== $player || $count == 4)
+         {
+           break;
+         }
+         $count++;
+         $i++;
+       }
+     }
+
+     // UP - LEFT
+     if ($count != 4)
+     {
+       $i = 1;
+       while ($row - $i >= 0 && $col - $i >= 0)
+       {
+         if ($this->board[$row - $i][$col - $i] !== $player || $count == 4)
+         {
+           break;
+         }
+         $count++;
+         $i++;
+       }
+     }
+
+     return $count>=4 ? true : false;
+   }
+ }
+
 
 
 class QueueConsumer
@@ -683,7 +709,9 @@ class QueueConsumer
           $tweetFrom = $data['user']['screen_name'];    // Username of the user that mentioned the bot
           $tweetID   = $data['id'];                     // ID of that tweet
           $tweetText = urldecode($data['text']);        // The tweet itself
-          $isReply   = $data['in_reply_to_status_id'];  // ID of the tweet it is replying to
+          $replyID   = $data['in_reply_to_status_id'];  // ID of the tweet it is replying to
+
+          $grabTweetID = false; // Defines if you want to grab the tweetID of the bot's response tweet
 
           log2file('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
           log2file(var_export($data, true));
@@ -693,7 +721,7 @@ class QueueConsumer
           if (!$commands) // Did not find any '/' command
           {
             // Check if tweet is a reply or just a new mention
-            if ($isReply == NULL)
+            if ($replyID == NULL)
             {
               //$gifID = $this->requester->requestRandomGIF("thanks");
               $arrPost = $this->requester->formatTweet("Thanks for mentioning me! \u{1F60D}", $tweetFrom, $tweetID);
@@ -744,158 +772,223 @@ class QueueConsumer
             else if ($commandArray[0] == "/c4")
             {
               // Grab the argurment for the /c4 command
-              $counterArg = $commandArray[1];
+              $c4Arg = $commandArray[1];
 
-              // Get counter info from DB
-              $sql = "SELECT UserID, Connect4 FROM userbase WHERE Username = '$tweetFrom'";
-              $serverReply = $this->requester->sqlQuery($sql);
+              // Initialize Tweet Messages booleans
+              $isArgValidNumeric = false;
+              $isArgValidCommand = false;
+              $startNewGame      = false;
+              $resetGame         = false;
 
-              // Check if user is in the database
-              if ($serverReply->num_rows == 1)
+              // Check if user game a valid argument
+              if (is_numeric($c4Arg))
               {
-                 // Users in the database; grab COUNTER value
-                 $userInfo = $serverReply->fetch_assoc();
-
-                 if (is_numeric($counterArg))
-                 {
-                   if ( $counterArg >= 1 && $counterArg <= 7 )
-                   {
-
-                   }
-                   else
-                   {
-                     $arrPost = $this->requester->formatTweet("Hey! Give me a value between 1 and 7!", $tweetFrom, $tweetID);
-                   }
-                 }
-
-                 switch ($counterArg)
-                 {
-                   case "inc": // Increment counter
-                   $sql = "UPDATE userbase SET Counter = Counter + 1 WHERE UserID = " .  $userInfo["UserID"];
-                   $serverReply = $this->requester->sqlQuery($sql);
-
-                   if ($serverReply === true)
-                   {
-                     log2file("MySQL: Counter from $tweetFrom was incremented. Current Value = " . ($userInfo["Counter"] + 1) );
-
-                     // Reply to original tweet, displaying COUNTER
-                     $arrPost = $this->requester->formatTweet("Incrementing counter! New value = " . ($userInfo["Counter"] + 1), $tweetFrom, $tweetID);
-                   }
-                   else
-                   {
-                     log2file("MySQL: Could not increment counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                     $arrPost = $this->requester->formatTweet("Failed to increment counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                   }
-                   break;
-
-                   case "dec": // Decrement counter
-
-                   $sql = "UPDATE userbase SET Counter = Counter - 1 WHERE UserID = " . $userInfo["UserID"];
-                   $serverReply = $this->requester->sqlQuery($sql);
-
-                   if ($serverReply === true)
-                   {
-                     log2file("MySQL: Counter from $tweetFrom was decremented. Current Value = " . ($userInfo["Counter"] - 1) );
-
-                     // Reply to original tweet, displaying COUNTER
-                     $arrPost = $this->requester->formatTweet("Decrementing counter! New value = " . ($userInfo["Counter"] - 1), $tweetFrom, $tweetID);
-                   }
-                   else
-                   {
-                     log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                     $arrPost = $this->requester->formatTweet("Failed to decrement counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                   }
-                   break;
-
-                    case "reset": // reset counter
-
-                    $sql = "UPDATE userbase SET Counter = 0 WHERE UserID = " . $userInfo["UserID"];
-                    $serverReply = $this->requester->sqlQuery($sql);
-                    if ($serverReply === true)
-                    {
-                      log2file("MySQL: Counter from $tweetFrom was set to 0");
-
-                      // Reply to original tweet, displaying COUNTER
-                      $arrPost = $this->requester->formatTweet("Resetting counter! New value = 0", $tweetFrom, $tweetID);
-                    }
-                    else
-                    {
-                      log2file("MySQL: Could not reset counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                      $arrPost = $this->requester->formatTweet("Failed to reset counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                    }
-                    break;
-
-                    case "show": // Display counter
-                    $arrPost = $this->requester->formatTweet("Here you go! Counter = " . $userInfo["Counter"], $tweetFrom, $tweetID);
-                    break;
-
-                    case "delete": // Delete counter - As of now, that removes the user from the DB
-                    $sql = "DELETE FROM userbase WHERE UserID = " . $userInfo["UserID"];
-                    $serverReply = $this->requester->sqlQuery($sql);
-                    if ($serverReply === true)
-                    {
-                      log2file("MySQL: Deleted $tweetFrom from DB");
-
-                      // Reply to original tweet, displaying COUNTER
-                      $arrPost = $this->requester->formatTweet("Your counter has been deleted! Thank you for using this bot!", $tweetFrom, $tweetID);
-                    }
-                    else
-                    {
-                      log2file("MySQL: Could not decrement counter from $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
-                      $arrPost = $this->requester->formatTweet("Failed to delete counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                    }
-                    break;
-
-
-                   default:    // Invalid argument
-                    $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
-                    break;
-                 }
-              }
-              else // User not in the database
-              {
-                switch ($counterArg)
+                if ( $c4Arg >= 1 && $c4Arg <= 7 )
                 {
-                  case "new": // Add user to database, creating a new COUNTER
+                  $c4Arg--; // To compensate for zero-based index array
+                  $isArgValidNumeric = true;
+                }
+                else
+                {
+                  $arrPost = $this->requester->formatTweet("Hey! Give me a value between 1 and 7!", $tweetFrom, $tweetID);
+                }
+              }
+              else // Argument is not a number
+              {
+                switch ($c4Arg)
+                {
+                  case 'new':
 
-                  // $expirationDate = time() + (1 * 24 * 60 * 60);
-                                            // 1 day; 24 hours; 60 mins; 60 secs
-                  $expirationDate = time() + (10 * 60);
-                                            // 10 mins; 60 secs
-                  $expirationDate = date('Y-m-d H:i:s', $expirationDate);
-                  $sql = "INSERT INTO userbase (Username, Counter, Expiration) VALUES('$tweetFrom', 0, '$expirationDate')";
+                    $c4Player2 = $commandArray[2];
 
-                  // Check if successfully added new user to DB
-                  $serverReply = $this->requester->sqlQuery($sql);
-                  if ($serverReply === true)
-                  {
-                    log2file("MySQL: $tweetFrom was added to the DB!");
-
-                    // Reply to original tweet, displaying COUNTER
-                    $arrPost = $this->requester->formatTweet("Created new counter! Value = 0", $tweetFrom, $tweetID);
-                  }
-                  else
-                  {
-                    log2file("MySQL: Could not add $tweetFrom to database \r\n ERROR: $sql \r\n $this->conn->error");
-                    $arrPost = $this->requester->formatTweet("Failed to create new counter! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
-                  }
+                    if (substr($c4Player2, 0, 1) == '@' ) // Check if second arg is a mention
+                    {
+                      $isArgValidCommand = true;
+                    }
+                    else
+                    {
+                      $arrPost = $this->requester->formatTweet("To start a new game, you have to tag your player 2.\nExample: /c4 new @ Player2", $tweetFrom, $tweetID);
+                    }
                     break;
 
-                  case "inc":
-                  case "dec":
-                  case "reset":
-                  case "show":
-                    // User tried to use the COUNTER before creating it
-                    $arrPost = $this->requester->formatTweet("Woah there! You need to create a counter (/counter new) before doing that command!", $tweetFrom, $tweetID);
-                    break;
-
-                  default: // Unknown argument for /command
-                    $arrPost = $this->requester->formatTweet("Invalid argument for /counter: $counterArg", $tweetFrom, $tweetID);
+                  default:
+                    $arrPost = $this->requester->formatTweet("Invalid argument for /c4: $c4Arg", $tweetFrom, $tweetID);
                     break;
                 }
               }
-            }
 
+              if ($isArgValidCommand || $isArgValidNumeric)
+              {
+                // Check if user is in DATABASE
+                $sql = "SELECT UserID, Username, Connect4, OGTweetID, Player2, Turn FROM userbase WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
+                $serverReply = $this->requester->sqlQuery($sql);
+                if ($serverReply->num_rows == 1)
+                {
+                   // Users in the database; grab Connect4 value
+                   $userInfo = $serverReply->fetch_assoc();
+
+                   // Check if user is replying to the right tweet
+                   if ($userInfo['OGTweetID'] == $replyID)
+                   {
+                     // Replying to the correct tweet; Create new board with info from DB
+                     $c4 = new ConnectFour($userInfo['Connect4'], $userInfo['Turn']);
+
+                     if ($tweetFrom == $userInfo['Username'])
+                     {
+                       $player = 'p1';
+                     }
+                     else // $tweetFrom == $userInfo['Player2']
+                     {
+                       $player = 'p2';
+                     }
+                   }
+                   else // not replying to the correct tweet
+                   {
+                     $arrPost = $this->requester->formatTweet("You have a game running in another tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
+                   }
+
+                   if ($isArgValidNumeric) // Play Circle arguments
+                   {
+
+                    $playResult = $c4->play($player, $c4Arg);
+                    $board = $c4->formatBoard();
+                    $boardStr = $c4->outputBoard();
+
+                    // Switch current player for printing Turn
+                    if ($player == 'p1')
+                    {
+                      $player = 'Player 1';
+                      $turn = 'Player 2';
+                      $dbTurn = 'p2';
+                    }
+                    else
+                    {
+                      $player = 'Player 2';
+                      $turn = 'Player 1';
+                      $dbTurn = 'p1';
+                    }
+
+                    switch ($playResult)
+                    {
+                      case 'successful move':
+                        $arrPost = $this->requester->formatTweet("$board\n Turn: $turn", $tweetFrom, $tweetID);
+                        $sql = "UPDATE userbase SET Turn = '$dbTurn', Connect4 = '$boardStr'  WHERE UserID = " .  $userInfo["UserID"];
+                        $serverReply = $this->requester->sqlQuery($sql);
+                        if ($serverReply === true)
+                        {
+                          log2file("MySQL: Successfully updated turn and board of $tweetFrom");
+                        }
+                        else
+                        {
+                          log2file("MySQL: Failed to update turn and board of $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                        }
+                        break;
+
+                      case 'win':
+                        $arrPost = $this->requester->formatTweet("$board\n @$tweetFrom wins! Congratulations!\n\n Thank you for using Tweet Games!", $tweetFrom, $tweetID);
+                        break;
+
+                      case 'wrong turn':
+                        $arrPost = $this->requester->formatTweet("$board\n Hey! It's not your turn!\n\nTurn: $player", $tweetFrom, $tweetID);
+                        break;
+
+                      case 'full column':
+                        $arrPost = $this->requester->formatTweet("$board\n That column is full. Try another one\n\nTurn: $player", $tweetFrom, $tweetID);
+                        break;
+
+                      case 'max moves':
+                        $arrPost = $this->requester->formatTweet("$board\n Wow, this is just... sad. YOU BOTH LOSE!\n\nTweet at me with the following command to play again: /c4 new", $tweetFrom, $tweetID);
+                        break;
+                    }
+                   }
+                   else // Valid Non-Numeric Command
+                   {
+                     switch ($c4Arg)
+                     {
+                       case 'new': // RESET game
+                       if ($replyID == NULL)
+                       {
+                         $resetGame = true;
+                       }
+                       else
+                       {
+                         $arrPost = $this->requester->formatTweet("You can only start a new game on an original tweet, not a reply! Try again by mentioning me with the command /c4 new", $tweetFrom, $tweetID);
+                       }
+
+                        break;
+                     }
+                   }
+                }
+                else // User is not in DATABASE
+                {
+                  if ($isArgValidCommand)
+                  {
+                    switch ($c4Arg)
+                    {
+                      case 'new': // Start new game
+                      if ($replyID == NULL)
+                      {
+                        $startNewGame = true;
+                      }
+                      else
+                      {
+                        $arrPost = $this->requester->formatTweet("You can only start a new game on an original tweet, not a reply! Try again by mentioning me with the command /c4 new", $tweetFrom, $tweetID);
+                      }
+                       break;
+                    }
+                  }
+                  else // User entered Valid numeric command, but they are not in the DATABASE
+                  {
+                    $arrPost = $this->requester->formatTweet("Hey! You need to start new game before doing that! Try using /c4 new", $tweetFrom, $tweetID);
+                  }
+                }
+              }
+
+              if ($startNewGame || $resetGame)
+              {
+                // Clear Connect4 server variable
+                if ($resetGame)
+                {
+                  $sql = "UPDATE userbase
+                  SET Connect4 = '0000000000000000000000000000000000000000000000000',
+                  Player2 = '$c4Player2',
+                  Turn = 'p1'
+                  WHERE UserID = " .  $userInfo["UserID"];
+                }
+                else // started new game
+                {
+                  $p2 = substr($c4Player2, 1); // Removes @
+
+                  $sql = "INSERT INTO userbase (Username, Connect4, Player2, Turn)
+                  VALUES('$tweetFrom',
+                         '0000000000000000000000000000000000000000000000000',
+                         '$p2',
+                         'p1'
+                        )";
+                }
+
+                $serverReply = $this->requester->sqlQuery($sql);
+                if ($serverReply === true)
+                {
+                  log2file("MySQL: Connect4 from $tweetFrom was reset");
+
+                  // Reply to original tweet, displaying new game
+                  $c4 = new ConnectFour();
+                  $board   =  $c4->formatBoard();
+                  $turn    = 'Player 1';
+                  $player1 = '@'. $tweetFrom;
+                  $player2 = $c4Player2;
+                  $arrPost = $this->requester->formatTweet("$board\nPlayer1: $player1\nPlayer2: $player2\nTurn: $turn\n\n", $tweetFrom, $tweetID);
+
+                  $grabTweetID = true;
+                }
+                else
+                {
+                  log2file("MySQL: Could not start new game for player $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+                  $arrPost = $this->requester->formatTweet("Failed to start new game! @SomeSeriousSith : You should check your log file...", $tweetFrom, $tweetID);
+                }
+              }
+            }
             // ADMIN COMMANDS
             else if ($commandArray[0] == "/stop")
             {
@@ -918,8 +1011,25 @@ class QueueConsumer
           if ($postReply)
           {
             // Post response tweet
-            $this->requester->postTweet($arrPost);
+            $response = $this->requester->postTweet($arrPost);
             log2file('Tweet posted: ' . $arrPost['status']);
+            log2file(var_export($response, true));
+
+            if ($grabTweetID)
+            {
+              $responseTwID = $response['id'];
+              // Update database!
+              $sql = "UPDATE userbase SET OGTweetID = $responseTwID WHERE Username = '$tweetFrom' OR Player2 = '$tweetFrom'";
+              $serverReply = $this->requester->sqlQuery($sql);
+              if ($serverReply === true)
+              {
+                log2file("MySQL: Successfully added OGTweetID to $tweetFrom");
+              }
+              else
+              {
+                log2file("MySQL: Failed to add OGTweetID to $tweetFrom \r\n ERROR: $sql \r\n $this->conn->error");
+              }
+            }
           }
         }
       }

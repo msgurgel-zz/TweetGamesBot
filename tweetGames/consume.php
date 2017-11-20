@@ -581,7 +581,7 @@ class QueueConsumer
   /**
    * Construct the consumer and start processing
    */
-  public function __construct($requester, $queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 30)
+  public function __construct($requester, $queueDir = './tmp', $filePattern = 'phirehose-queue*.queue', $checkInterval = 10)
   {
     $this->queueDir = $queueDir;
     $this->filePattern = $filePattern;

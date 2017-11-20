@@ -808,6 +808,7 @@ class QueueConsumer
                     if (substr($c4Player2, 0, 1) == '@' ) // Check if second arg is a mention
                     {
                       $isArgValidCommand = true;
+                      $c4Player2 = substr($c4Player2, 1); // Remove @ from player name
                     }
                     else
                     {
@@ -828,6 +829,8 @@ class QueueConsumer
                 $serverReply = $this->requester->sqlQuery($sql);
                 if ($serverReply->num_rows == 1)
                 {
+				           $wrongReply = false; // Initialize wrongReply
+
                    // Users in the database; grab Connect4 value
                    $userInfo = $serverReply->fetch_assoc();
 
@@ -849,9 +852,10 @@ class QueueConsumer
                    else // not replying to the correct tweet
                    {
                      $arrPost = $this->requester->formatTweet("You have a game running in another tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
+                     $wrongReply = true;
                    }
 
-                   if ($isArgValidNumeric) // Play Circle arguments
+                   if ($isArgValidNumeric && !$wrongReply) // Play Circle arguments
                    {
 
                     $playResult = $c4->play($player, $c4Arg);
@@ -876,6 +880,7 @@ class QueueConsumer
                     {
                       case 'successful move':
                         $arrPost = $this->requester->formatTweet("$board\n Turn: $turn", $tweetFrom, $tweetID);
+                        $grabTweetID = true;
                         $sql = "UPDATE userbase SET Turn = '$dbTurn', Connect4 = '$boardStr'  WHERE UserID = " .  $userInfo["UserID"];
                         $serverReply = $this->requester->sqlQuery($sql);
                         if ($serverReply === true)
@@ -890,22 +895,26 @@ class QueueConsumer
 
                       case 'win':
                         $arrPost = $this->requester->formatTweet("$board\n @$tweetFrom wins! Congratulations!\n\n Thank you for using Tweet Games!", $tweetFrom, $tweetID);
+                        $grabTweetID = true;
                         break;
 
                       case 'wrong turn':
                         $arrPost = $this->requester->formatTweet("$board\n Hey! It's not your turn!\n\nTurn: $player", $tweetFrom, $tweetID);
+                        $grabTweetID = true;
                         break;
 
                       case 'full column':
                         $arrPost = $this->requester->formatTweet("$board\n That column is full. Try another one\n\nTurn: $player", $tweetFrom, $tweetID);
+                        $grabTweetID = true;
                         break;
 
                       case 'max moves':
                         $arrPost = $this->requester->formatTweet("$board\n Wow, this is just... sad. YOU BOTH LOSE!\n\nTweet at me with the following command to play again: /c4 new", $tweetFrom, $tweetID);
+                        $grabTweetID = true;
                         break;
                     }
                    }
-                   else // Valid Non-Numeric Command
+                   else if ($isArgValidCommand && !$wrongReply) // Valid Non-Numeric Command
                    {
                      switch ($c4Arg)
                      {
@@ -961,12 +970,10 @@ class QueueConsumer
                 }
                 else // started new game
                 {
-                  $p2 = substr($c4Player2, 1); // Removes @
-
                   $sql = "INSERT INTO userbase (Username, Connect4, Player2, Turn)
                   VALUES('$tweetFrom',
                          '0000000000000000000000000000000000000000000000000',
-                         '$p2',
+                         '$c4Player2',
                          'p1'
                         )";
                 }
@@ -981,7 +988,7 @@ class QueueConsumer
                   $board   =  $c4->formatBoard();
                   $turn    = 'Player 1';
                   $player1 = '@'. $tweetFrom;
-                  $player2 = $c4Player2;
+                  $player2 = '@'. $c4Player2;
                   $arrPost = $this->requester->formatTweet("$board\nPlayer1: $player1\nPlayer2: $player2\nTurn: $turn\n\n", $tweetFrom, $tweetID);
 
                   $grabTweetID = true;
@@ -1008,7 +1015,7 @@ class QueueConsumer
             }
             else // Invalid command
             {
-              $post = false;
+              $postReply = false;
             }
           }
 

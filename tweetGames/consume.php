@@ -341,10 +341,13 @@ class Requester
 
    public function formatBoard()
    {
-     $emojiEmpty = "\{u26AA}"; // WHITE CIRCLE
+     $emojiEmpty = "\u{26AA}"; // WHITE CIRCLE
+     $emojiP1    = "\u{1F369}"; // DOUGHNUT
+     $emojiP2    = "\u{1F36A}"; // COOKIE
+
      //$emojiEmpty = "\u{1F518}";  // Radio Button
-     $emojiP1    = "\u{1F534}"; // Red Circle
-     $emojiP2    = "\u{1F535}"; // Blue Circle
+     //$emojiP1    = "\u{1F534}"; // Red Circle
+     //$emojiP2    = "\u{1F535}"; // Blue Circle
 
      $formattedStr = "";
 

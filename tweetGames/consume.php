@@ -17,7 +17,7 @@
 require_once('../lib/TwitterAPIExchange.php');
 
 /**
- *
+ * Makes request to outside sources
  */
 class Requester
 {
@@ -289,7 +289,7 @@ class Requester
 }
 
 /**
- *
+ * Holds connect 4 game logic
  */
  class ConnectFour
  {
@@ -325,6 +325,10 @@ class Requester
          for ($j=0; $j < self::COL ; $j++)
          {
            $this->board[$i][$j] = substr($board, self::COL * $i + $j, 1);
+           if ($this->board[$i][$j] != 0)
+           {
+             $this->moves++;
+           }
          }
        }
      }
@@ -390,7 +394,6 @@ class Requester
      return $formattedStr;
    }
 
-
    public function outputBoard()
    {
      $boardStr = '';
@@ -424,7 +427,7 @@ class Requester
 
      if ($this->turn == $player)
      {
-       for ($i=self::ROW - 1; $i >= 0 ; $i--)
+       for ($i = self::ROW - 1; $i >= 0 ; $i--)
        {
          if ($this->board[$i][$colSelected] == 0)
          {
@@ -441,8 +444,8 @@ class Requester
            else
            {
              $retVal = 'successful move';
-           }
 
+           }
            break;
          }
          if ($i == 0)
@@ -489,7 +492,7 @@ class Requester
      // RIGHT
      for ($i = $col; $i < self::COL  ; $i++)
      {
-       if ($this->board[$row][$i] !== $player || $count == 4 )
+       if ($this->board[$row][$i] != $player || $count == 4 )
        {
          break;
        }
@@ -501,7 +504,7 @@ class Requester
      {
        for ($i = $col - 1; $i >= 0 ; $i--)
        {
-         if ($this->board[$row][$i] !== $player || $count == 4)
+         if ($this->board[$row][$i] != $player || $count == 4)
          {
            break;
          }
@@ -520,7 +523,7 @@ class Requester
      // DOWN
      for ($i = $row; $i < self::ROW  ; $i++)
      {
-       if ($this->board[$i][$col] !== $player || $count == 4)
+       if ($this->board[$i][$col] != $player || $count == 4)
        {
          break;
        }
@@ -532,7 +535,7 @@ class Requester
      {
        for ($i = $row - 1; $i >= 0 ; $i--)
        {
-         if ($this->board[$i][$col] !== $player || $count == 4)
+         if ($this->board[$i][$col] != $player || $count == 4)
          {
            break;
          }
@@ -551,7 +554,7 @@ class Requester
      $i = 0;
      while ($row + $i< self::ROW && $col + $i < self::COL)
      {
-       if ($this->board[$row + $i][$col + $i] !== $player || $count == 4 )
+       if ($this->board[$row + $i][$col + $i] != $player || $count == 4 )
        {
          break;
        }
@@ -565,7 +568,7 @@ class Requester
        $i = 1; // Ignore [$row][$col]
        while ($row - $i >= 0 && $col + $i < self::COL)
        {
-         if ($this->board[$row - $i][$col + $i] !== $player || $count == 4)
+         if ($this->board[$row - $i][$col + $i] != $player || $count == 4)
          {
            break;
          }
@@ -580,7 +583,7 @@ class Requester
        $i = 1;
        while ($row + $i < self::ROW && $col - $i >= 0)
        {
-         if ($this->board[$row + $i][$col - $i] !== $player || $count == 4)
+         if ($this->board[$row + $i][$col - $i] != $player || $count == 4)
          {
            break;
          }
@@ -595,7 +598,7 @@ class Requester
        $i = 1;
        while ($row - $i >= 0 && $col - $i >= 0)
        {
-         if ($this->board[$row - $i][$col - $i] !== $player || $count == 4)
+         if ($this->board[$row - $i][$col - $i] != $player || $count == 4)
          {
            break;
          }
@@ -729,7 +732,7 @@ class QueueConsumer
           $grabTweetID = false; // Defines if you want to grab the tweetID of the bot's response tweet
 
           log2file('Bot got mentioned: ' . $tweetFrom . ': ' . $tweetText);
-          log2file(var_export($data, true));
+          //log2file(var_export($data, true));
 
           // Look for commands in tweet
           $commands = strchr($tweetText, '/');
@@ -796,7 +799,7 @@ class QueueConsumer
               $resetGame         = false;
 
               // Check if user game a valid argument
-              if (is_numeric($c4Arg))
+              if ( is_numeric($c4Arg) )
               {
                 if ( $c4Arg >= 1 && $c4Arg <= 7 )
                 {
@@ -812,7 +815,7 @@ class QueueConsumer
               {
                 switch ($c4Arg)
                 {
-                  case 'new':
+                  case "new":
 
                     $c4Player2 = $commandArray[2];
 
@@ -848,9 +851,9 @@ class QueueConsumer
                    // Check if user is replying to the right tweet
                    if ($userInfo['TweetID'] == $replyID)
                    {
+                     log2file('Replying to the right tweet');
                      // Replying to the correct tweet; Create new board with info from DB
                      $c4 = new ConnectFour($userInfo['Connect4'], $userInfo['Turn']);
-
                      if ($tweetFrom == $userInfo['Username'])
                      {
                        $currentPlayer = 'p1';
@@ -863,17 +866,17 @@ class QueueConsumer
                    else // not replying to the correct tweet
                    {
                      // If the replied to the wrong tweet and does not want to reset the game...
-                     if (!$c4Arg == 'new')
+                     if ($c4Arg != 'new')
                      {
-                       $arrPost = $this->requester->formatTweet("You have a game running in another tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
+                       $arrPost = $this->requester->formatTweet("You're replying to the wrong tweet! Reply to the that tweet with your command or start a new game by mentioning me with /c4 new", $tweetFrom, $tweetID);
                        $wrongReply = true;
                      }
                    }
 
                    if ($isArgValidNumeric && !$wrongReply) // Play Circle arguments
                    {
-
                     $playResult = $c4->play($currentPlayer, $c4Arg);
+                    log2file('Play Result = ' . $playResult);
                     $board = $c4->formatBoard();
                     $boardStr = $c4->outputBoard();
 
@@ -882,20 +885,32 @@ class QueueConsumer
                       // Switch current player for printing turn
                       if ($currentPlayer == 'p1')
                       {
-                        $playerTurn = $data['Player2'];
+                        $playerTurn = '@' . $userInfo['Player2'];
                         $dbTurn = 'p2';
                       }
                       else // $currentPlayer == 'p2'
                       {
-                        $playerTurn = $data['Username'];
+                        $playerTurn = '@' . $userInfo['Username'];
                         $dbTurn = 'p1';
+                      }
+                    }
+                    else
+                    {
+                      // Switch current player for printing turn
+                      if ($currentPlayer == 'p1')
+                      {
+                        $playerTurn = '@' . $userInfo['Username'];
+                      }
+                      else // $currentPlayer == 'p2'
+                      {
+                        $playerTurn = '@' . $userInfo['Player2'];
                       }
                     }
 
 
                     switch ($playResult)
                     {
-                      case 'successful move':
+                      case "successful move":
                         $arrPost = $this->requester->formatTweet("$board\n Turn: $playerTurn", $tweetFrom, $tweetID);
                         $grabTweetID = true; // Update TweetID in DB
 
@@ -911,22 +926,22 @@ class QueueConsumer
                         }
                         break;
 
-                      case 'win':
+                      case "win":
                         $arrPost = $this->requester->formatTweet("$board\n @$tweetFrom wins! Congratulations!\n\n Thank you for using Tweet Games!", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
 
-                      case 'wrong turn':
+                      case "wrong turn":
                         $arrPost = $this->requester->formatTweet("$board\n Hey! It's not your turn!\n\nTurn: $playerTurn", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
 
-                      case 'full column':
+                      case "full column":
                         $arrPost = $this->requester->formatTweet("$board\n That column is full. Try another one\n\nTurn: $playerTurn", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
 
-                      case 'max moves':
+                      case "max moves":
                         $arrPost = $this->requester->formatTweet("$board\n Wow, this is just... sad. YOU BOTH LOSE!\n\nTweet at me with the following command to play again: /c4 new", $tweetFrom, $tweetID);
                         $grabTweetID = true;
                         break;
@@ -1018,6 +1033,7 @@ class QueueConsumer
                 }
               }
             }
+
             // ADMIN COMMANDS
             else if ($commandArray[0] == "/stop")
             {
@@ -1031,6 +1047,7 @@ class QueueConsumer
                 $arrPost = $this->requester->formatTweet("Hey, only @SomeSeriousSith can use that command!", $tweetFrom, $tweetID);
               }
             }
+
             else // Invalid command
             {
               $postReply = false;
@@ -1042,7 +1059,7 @@ class QueueConsumer
             // Post response tweet
             $response = $this->requester->postTweet($arrPost);
             log2file('Tweet posted: ' . $arrPost['status']);
-            log2file(var_export($response, true));
+            //log2file(var_export($response, true));
 
             if ($grabTweetID)
             {

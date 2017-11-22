@@ -1,8 +1,4 @@
 <?php
-require_once('../lib/Phirehose.php');
-require_once('../lib/OauthPhirehose.php');
-
-
 /**
  * Tweet Games Bot : Play games on Twitter (Tweet Collector)
  *
@@ -19,6 +15,11 @@ require_once('../lib/OauthPhirehose.php');
  * @link     http://github.com/msgurgel/
  * @see      Twitter-API-PHP, Phirehose
  */
+
+require_once('../lib/Phirehose.php');
+require_once('../lib/OauthPhirehose.php');
+
+
 class QueueCollector extends OauthPhirehose
 {
 
@@ -111,7 +112,7 @@ class QueueCollector extends OauthPhirehose
 
     // Construct stream file name, log and open
     $this->streamFile = $this->queueDir . '/' . self::QUEUE_FILE_ACTIVE;
-    $this->myLog('Opening new active status stream: ' . $this->streamFile);
+    $this->log2File('Opening new active status stream: ' . $this->streamFile);
     $this->statusStream = fopen($this->streamFile, 'a'); // Append if present (crash recovery)
 
     if (!is_resource($this->statusStream))
@@ -151,7 +152,7 @@ class QueueCollector extends OauthPhirehose
     }
 
     // At this point, all looking good - the next call to getStream() will create a new active file
-    $this->myLog('Successfully rotated active stream to queue file: ' . $queueFile);
+    $this->log2File('Successfully rotated active stream to queue file: ' . $queueFile);
   }
 
   /**
@@ -160,9 +161,13 @@ class QueueCollector extends OauthPhirehose
    * @see error_log()
    * @param string $messages
    */
-  protected function myLog($message)
+  protected function log2File($message)
   {
-    @error_log('collect.php: ' . $message, 0);
+    $myFile = fopen("collect.log", "a") or die("Unable to open collect.log file!");
+    $timeNow = date('Y-m-d H:i:s');
+    $txt = $timeNow . '--' . $message . "\r\n";
+    fwrite($myFile, $txt);
+    fclose($myFile);
   }
 
 } // End of class

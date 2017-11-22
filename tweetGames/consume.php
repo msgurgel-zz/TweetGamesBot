@@ -17,7 +17,12 @@
 require_once('../lib/TwitterAPIExchange.php');
 
 /**
- * Makes request to outside sources
+ * Makes requests to outside sources
+ *
+ * This Class makes/receives requests to/from:
+ *    The Twitter API (using TwitterAPIExchange.php)
+ *    The GIPHY API (using cURL)
+ *    The MySQL database
  */
 class Requester
 {
@@ -76,6 +81,17 @@ class Requester
   }
 
   /**
+  * Formats tweet before posting
+  *
+  * @param string $message        Text that will be turned into a tweet
+  * @param string $user           Twitter handle of the user you want your tweet to reply to/mention
+  * @param int    $tweetReplyID   ID of the tweet you want to reply to
+  * @param int    $mediaID        ID of the media you want to attach to the tweet (image, gif, video)
+  *
+  * @return array Contains the fields required to post a tweet (message, replyID, etc)
+  *
+  * @see          Requester::postTweet()          To understand how the returned array is used
+  * @see          Requester::requestRandomGIF     To understand how the mediaID is generated
   *
   */
   public function formatTweet($message, $user = NULL, $tweetReplyID = NULL, $mediaID = NULL)
@@ -614,8 +630,6 @@ class Requester
    }
  }
 
-
-
 class QueueConsumer
 {
 
@@ -1105,12 +1119,11 @@ class QueueConsumer
 /**
  * Basic log function.
  *
- * @see error_log()
  * @param string $messages
  */
 function log2file($message)
 {
-  $myFile = fopen("consume.log", "a") or die("Unable to open file!");
+  $myFile = fopen("consume.log", "a") or die("Unable to open consume.log file!");
   $timeNow = date('Y-m-d H:i:s');
   $txt = $timeNow . '--' . $message . "\r\n";
   fwrite($myFile, $txt);

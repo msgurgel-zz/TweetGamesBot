@@ -70,24 +70,6 @@ class QueueCollector extends OauthPhirehose
     // Write the status to the stream (must be via getStream())
     fputs($this->getStream(), $status .PHP_EOL);
 
-    /*
-     * As of version 0.1, we rotate the current queue file every time the Twitter
-     * Streaming API return a result. If the bot gets popular a some point in the
-     * future, we can use the code below to avoid overwhelming the server.
-     */
-
-     /*
-     $now = time();
-     if (($now - $this->lastRotated) > $this->rotateInterval)
-     {
-      // Mark last rotation time as now
-      $this->lastRotated = $now;
-
-      // Rotate it
-      $this->rotateStreamFile();
-    }
-    */
-
     $this->rotateStreamFile();
   }
 

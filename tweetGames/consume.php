@@ -576,10 +576,14 @@ class Requester
        }
      }
 
+
+
      // DOWN - LEFT
      if ($count != 4)
      {
-       $i = 1;
+       // Changing angle; reset count
+       $count = 0;
+       $i = 0;
        while ($row + $i < self::ROW && $col - $i >= 0)
        {
          if ($this->board[$row + $i][$col - $i] != $player || $count == 4)

@@ -1,8 +1,4 @@
 <?php
-require_once('../lib/Phirehose.php');
-require_once('../lib/OauthPhirehose.php');
-
-
 /**
  * Tweet Games Bot : Play games on Twitter (Tweet Collector)
  *
@@ -19,6 +15,11 @@ require_once('../lib/OauthPhirehose.php');
  * @link     http://github.com/msgurgel/
  * @see      Twitter-API-PHP, Phirehose
  */
+
+require_once('../lib/Phirehose.php');
+require_once('../lib/OauthPhirehose.php');
+
+
 class QueueCollector extends OauthPhirehose
 {
 
@@ -42,7 +43,7 @@ class QueueCollector extends OauthPhirehose
    * @param string $queueDir Directory where queue files are stored. Default = ./tmp
    * @param integer $rotateInterval Time in sec that determines when to rotate current queue file. Default = 5
    */
-  public function __construct($username, $password, $queueDir = './tmp', $rotateInterval = 30)
+  public function __construct($username, $password, $queueDir = './tmp', $rotateInterval = 10)
   {
     // Sanity check
     if ($rotateInterval < 5)
@@ -69,24 +70,6 @@ class QueueCollector extends OauthPhirehose
     // Write the status to the stream (must be via getStream())
     fputs($this->getStream(), $status .PHP_EOL);
 
-    /*
-     * As of version 0.1, we rotate the current queue file every time the Twitter
-     * Streaming API return a result. If the bot gets popular a some point in the
-     * future, we can use the code below to avoid overwhelming the server.
-     */
-
-     /*
-     $now = time();
-     if (($now - $this->lastRotated) > $this->rotateInterval)
-     {
-      // Mark last rotation time as now
-      $this->lastRotated = $now;
-
-      // Rotate it
-      $this->rotateStreamFile();
-    }
-    */
-
     $this->rotateStreamFile();
   }
 
@@ -111,7 +94,7 @@ class QueueCollector extends OauthPhirehose
 
     // Construct stream file name, log and open
     $this->streamFile = $this->queueDir . '/' . self::QUEUE_FILE_ACTIVE;
-    $this->myLog('Opening new active status stream: ' . $this->streamFile);
+    $this->log2File('Opening new active status stream: ' . $this->streamFile);
     $this->statusStream = fopen($this->streamFile, 'a'); // Append if present (crash recovery)
 
     if (!is_resource($this->statusStream))
@@ -151,18 +134,22 @@ class QueueCollector extends OauthPhirehose
     }
 
     // At this point, all looking good - the next call to getStream() will create a new active file
-    $this->myLog('Successfully rotated active stream to queue file: ' . $queueFile);
+    $this->log2File('Successfully rotated active stream to queue file: ' . $queueFile);
   }
 
   /**
    * Basic log function.
    *
-   * @see error_log()
+   *
    * @param string $messages
    */
-  protected function myLog($message)
+  protected function log2File($message)
   {
-    @error_log('collect.php: ' . $message, 0);
+    $myFile = fopen("collect.log", "a") or die("Unable to open collect.log file!");
+    $timeNow = date('Y-m-d H:i:s');
+    $txt = $timeNow . '--' . $message . "\r\n";
+    fwrite($myFile, $txt);
+    fclose($myFile);
   }
 
 } // End of class

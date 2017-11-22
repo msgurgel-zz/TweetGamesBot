@@ -158,7 +158,7 @@ class QueueCollector extends OauthPhirehose
   /**
    * Basic log function.
    *
-   * @see error_log()
+   *
    * @param string $messages
    */
   protected function log2File($message)

@@ -5,7 +5,7 @@
  * Code for this collector is based of fennb's example: ghetto-queue-collect.php
  *
  * Using libraries:
- *    Phirehose by fennb - https://github.com/fennb/phirehose
+ *    Phirehose by fennb - <https://github.com/fennb/phirehose>
  *
  * PHP version 7
  *
@@ -13,13 +13,22 @@
  * @version  0.1
  * @license  MIT
  * @link     http://github.com/msgurgel/
- * @see      Twitter-API-PHP, Phirehose
+ * @see      Twitter-API-PHP ({@link https://github.com/J7mbo/twitter-api-php}), Phirehose ({@link https://github.com/fennb/phirehose})
  */
 
 require_once('../lib/Phirehose.php');
 require_once('../lib/OauthPhirehose.php');
 
 
+/**
+* Collects real-time mentions of the bot and formats them into .queue files
+*
+* This class uses the *Phirehose* API to receive Twitter mentions of the bot (*@TweetGamesBot*).
+* It stores the data about the tweets as a string in .queue files, named using the datetime
+* when they were generated.
+*
+* This class is based on the ghettoQueueCollect
+*/
 class QueueCollector extends OauthPhirehose
 {
 
@@ -103,7 +112,7 @@ class QueueCollector extends OauthPhirehose
     }
 
     // If we don't have a last rotated time, it's effectively now
-    // As of version 0.1, this really doesn't mean anything.
+    // As of version 0.3, this really doesn't mean anything.
     if ($this->lastRotated == NULL)
     {
       $this->lastRotated = time();
@@ -115,6 +124,9 @@ class QueueCollector extends OauthPhirehose
 
   /**
    * Rotates the stream file if due
+   *
+   * Currently, rotates everytime it receives a mention.
+   * If the bot gets too popular, this will have to be updated.
    */
   private function rotateStreamFile()
   {

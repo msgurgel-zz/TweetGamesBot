@@ -11,6 +11,15 @@ CREATE DATABASE IF NOT EXISTS tweetgames;
 USE tweetgames;
 
 DROP TABLE IF EXISTS userbase;
+
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS games;
+DROP TABLE IF EXISTS game_room;
+DROP TABLE IF EXISTS connect_four;
+
+
+
+/*
 CREATE TABLE userbase 
 (
   UserID 		INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -21,5 +30,40 @@ CREATE TABLE userbase
   Player2		MEDIUMTEXT NOT NULL,
   Turn			MEDIUMTEXT NOT NULL,
   Expiration 	DATETIME DEFAULT '0000-00-00 00:00:00'
+);
+*/
+
+CREATE TABLE users
+(
+	UserID			INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    PRIMARY KEY		(UserID),
+    Username		MEDIUMTEXT NOT NULL
+);
+
+
+CREATE TABLE games
+(
+	GameID			INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    PRIMARY KEY 	(GameID),
+    TweetID			LONGTEXT NOT NULL,
+    Expiration		DATETIME DEFAULT '0000-00-00 00:00:00'
+);
+
+
+CREATE TABLE game_room
+(
+	PlayerOneID		INT UNSIGNED NOT NULL,
+    GameID			INT UNSIGNED NOT NULL,
+    PRIMARY KEY		(PlayerOneID, GameID),
+    FOREIGN KEY		(PlayerOneID) REFERENCES users (UserID),
+    FOREIGN KEY		(GameID) REFERENCES games (GameID)
+);
+
+CREATE TABLE connect_four
+(
+	PlayerTwoID		INT UNSIGNED NOT NULL,
+    FOREIGN KEY		(PlayerTwoID) REFERENCES users (UserID),
+    Board			VARCHAR(49) DEFAULT NULL,
+    Turn			BOOLEAN
 );
 

@@ -1,17 +1,13 @@
 <?php
 
-require_once('../lib/support/logging.php');
+require_once('../support/logging.php');
+require_once ('../../tweetGames/TheKeys.php');
 
   class GiphyComms
   {
-
     /**
     * Class Attributes
     */
-
-    // Constants
-    const GIPHY_KEY  = 'YOUR KEY';
-
     // Variables
     private $gifID;
     private $gifIDExpiration;
@@ -43,7 +39,7 @@ require_once('../lib/support/logging.php');
       $curl = curl_init();
       curl_setopt_array($curl, array(
         CURLOPT_RETURNTRANSFER => 1,
-        CURLOPT_URL => "api.giphy.com/v1/gifs/random?api_key=" . self::GIPHY_KEY . "&tag=$tag"
+        CURLOPT_URL => "api.giphy.com/v1/gifs/random?api_key=" . GIPHY_KEY . "&tag=$tag"
       ));
 
       // Execute Request until GIF size is < 15 MB, then close connection
@@ -59,5 +55,3 @@ require_once('../lib/support/logging.php');
       return $path;
     }
   }
-
-?>

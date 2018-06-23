@@ -14,4 +14,4 @@ function log2file($event, $message)
   fclose($myFile);
 }
 
-?>
+

@@ -2,6 +2,7 @@
 require_once('../lib/api/Phirehose.php');
 require_once('../lib/api/OauthPhirehose.php');
 require_once('../lib/support/logging.php');
+require_once('TheKeys.php');
 
 
 /**
@@ -35,14 +36,15 @@ class QueueCollector extends OauthPhirehose
   protected $statusStream;
   protected $lastRotated;
 
-  /**
-   * Overidden constructor to take class-specific parameters
-   *
-   * @param string $username OAuth Access Token
-   * @param string $password OAuth Access Token Secret
-   * @param string $queueDir Directory where queue files are stored. Default = ./tmp
-   * @param integer $rotateInterval Time in sec that determines when to rotate current queue file. Default = 5
-   */
+    /**
+     * Overidden constructor to take class-specific parameters
+     *
+     * @param string $username OAuth Access Token
+     * @param string $password OAuth Access Token Secret
+     * @param string $queueDir Directory where queue files are stored. Default = ./tmp
+     * @param integer $rotateInterval Time in sec that determines when to rotate current queue file. Default = 5
+     * @throws Exception
+     */
   public function __construct($username, $password, $queueDir = './tmp', $rotateInterval = 10)
   {
     // Sanity check
@@ -59,11 +61,12 @@ class QueueCollector extends OauthPhirehose
     return parent::__construct($username, $password, Phirehose::METHOD_FILTER);
   }
 
-  /**
-   * Enqueue each status
-   *
-   * @param string $status
-   */
+    /**
+     * Enqueue each status
+     *
+     * @param string $status
+     * @throws Exception
+     */
   public function enqueueStatus($status)
   {
 
@@ -91,11 +94,12 @@ class QueueCollector extends OauthPhirehose
     $this->rotateStreamFile();
   }
 
-  /**
-   * Returns a stream resource for the current file being written/enqueued to
-   *
-   * @return resource
-   */
+    /**
+     * Returns a stream resource for the current file being written/enqueued to
+     *
+     * @return resource
+     * @throws Exception
+     */
   private function getStream()
   {
     // If we have a valid stream, return it
@@ -159,13 +163,13 @@ class QueueCollector extends OauthPhirehose
 } // End of class
 
 // The OAuth credentials from apps.twitter.com
-define("TWITTER_CONSUMER_KEY", "YOUR KEY");
-define("TWITTER_CONSUMER_SECRET", "YOUR SECRET");
+define("TWITTER_CONSUMER_KEY", SETTINGS['consumer_key']);
+define("TWITTER_CONSUMER_SECRET", SETTINGS['consumer_secret']);
 
 
 // The OAuth data for the twitter account
-define("OAUTH_TOKEN", "YOUR TOKEN");
-define("OAUTH_SECRET", "YOUR SECRET");
+define("OAUTH_TOKEN", SETTINGS['oauth_access_token']);
+define("OAUTH_SECRET", SETTINGS['oauth_access_token_secret']);
 
 // Start streaming/collecting
 $sc = new QueueCollector(OAUTH_TOKEN, OAUTH_SECRET);

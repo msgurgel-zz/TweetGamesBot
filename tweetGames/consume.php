@@ -86,10 +86,10 @@ class QueueConsumer
     } // Infinite loop
   } // End process()
 
-  /**
-   * Processes a queue file and does something with it (example only)
-   * @param string $queueFile The queue file
-   */
+    /**
+     * Processes a queue file and does something with it (example only)
+     * @param string $queueFile The queue file
+     */
   protected function processQueueFile($queueFile)
   {
     // Initialize Variables

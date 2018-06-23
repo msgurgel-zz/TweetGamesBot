@@ -1,6 +1,7 @@
 <?php
 
-require_once('../lib/support/logging.php');
+require_once('../support/logging.php');
+require_once ('../../tweetGames/TheKeys.php');
 /**
 * Handles communications with MySQL Database.
 */
@@ -10,13 +11,6 @@ class mySqlConnector
   /**
   * Member Attributes
   */
-
-  // Class Constants
-  const SERVER_NAME  = "YOUR IP";
-  const USERNAME     = "YOUR USERNAME";
-  const PASSWORD     = "YOUR PASSWORD";
-  const DB_NAME      = "YOUR DATABASE";
-
   // Class variables
   private $conn; // Objects that is handles communications with database.
 
@@ -25,9 +19,8 @@ class mySqlConnector
   */
   function __construct()
   {
-
     // Connect to DB
-    $this->conn = new mysqli(self::SERVER_NAME, self::USERNAME, self::PASSWORD, self::DB_NAME);
+    $this->conn = new mysqli(SERVER_NAME, USERNAME, PASSWORD, DB_NAME);
     if ($this->conn->connect_error)
     {
         log2file("mySqlConnector.__construct", "MySQL: Failed to connect to the server. ERROR: " . $this->conn->connect_error);
@@ -54,8 +47,4 @@ class mySqlConnector
   {
     $this->conn->close();
   }
-
 }
-
-
-?>

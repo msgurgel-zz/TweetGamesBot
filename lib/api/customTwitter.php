@@ -1,18 +1,9 @@
 <?php
 
-require_once('../lib/support/logging.php');
+require_once('../support/logging.php');
 
 class TwitterComms
 {
-
-  // Twitter API - Constants
-  const SETTINGS = array(
-  'oauth_access_token' => "YOUR TOKEN",
-  'oauth_access_token_secret' => "YOUR SECRET",
-  'consumer_key' => "YOUR KEY",
-  'consumer_secret' => "YOUR SECRET"
-  );
-
   const urlUPDATE = "https://api.twitter.com/1.1/statuses/update.json";
   const urlMEDIA = "https://upload.twitter.com/1.1/media/upload.json";
 
@@ -49,18 +40,20 @@ class TwitterComms
     return $retVal;
   }
 
-  /**
-  * Post tweet through the twitter-api-php library
-  *
-  * @see TwitterAPIExchange.php
-  * @param $postfields parameters for the Twitter API request
-  */
-  public function postTweet($postfields)
+    /**
+     * Post tweet through the twitter-api-php library
+     *
+     * @see TwitterAPIExchange.php
+     * @param $postFields Array for the Twitter API request
+     * @return mixed
+     * @throws Exception
+     */
+  public function postTweet($postFields)
   {
-    $twitter = new TwitterAPIExchange(self::SETTINGS);
+    $twitter = new TwitterAPIExchange(SETTINGS);
 
     $twResponse = $twitter->buildOauth(self::urlUPDATE, "POST")
-    ->setPostfields($postfields)
+    ->setPostfields($postFields)
     ->performRequest();
 
     return json_decode($twResponse, true);
@@ -70,7 +63,7 @@ class TwitterComms
   {
 
     // Prepare INIT request
-    $postfields = array(
+    $postFields = array(
       'command'        => 'INIT',
       'total_bytes'    => filesize($path),
       'media_type'     => 'image/gif',
@@ -80,7 +73,7 @@ class TwitterComms
     // Make INIT request
     $twitter = new TwitterAPIExchange(self::SETTINGS);
     $response = $twitter->buildOauth(self::urlMEDIA, "POST")
-    ->setPostfields($postfields)
+    ->setPostfields($postFields)
     ->performRequest();
 
     log2file("TwitterComms.requestRandomGIF","Made INIT request!");
@@ -97,7 +90,7 @@ class TwitterComms
     foreach ($chunkArr as $value)
     {
       // Prepare APPEND request
-      $postfields = array(
+      $postFields = array(
         'command'        => 'APPEND',
         'media_id'       => $mediaID,
         'media_data'     => $value,
@@ -110,7 +103,7 @@ class TwitterComms
 
        // Make APPEND request
        $response = $twitter->buildOauth(self::urlMEDIA, "POST")
-       ->setPostfields($postfields)
+       ->setPostfields($postFields)
        ->performRequest();
 
        log2file("TwitterComms.requestRandomGIF", "Made APPEND request #$index!");
@@ -118,14 +111,14 @@ class TwitterComms
 
 
     // GIF has been uploaded; Prepare FINALIZE command
-    $postfields = array(
+    $postFields = array(
       'command' => 'FINALIZE',
       'media_id'=> $mediaID
      );
 
      // Make FINALIZE request
      $response = $twitter->buildOauth(self::urlMEDIA, "POST")
-     ->setPostfields($postfields)
+     ->setPostfields($postFields)
      ->performRequest();
 
      log2file("TwitterComms.requestRandomGIF", "Made FINALIZE request!");
